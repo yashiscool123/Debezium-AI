@@ -54,6 +54,9 @@ public class RBACFilter implements ContainerRequestFilter {
         Map.entry("GET:/v4/auth/service/", Permission.USER_READ),
         Map.entry("POST:/v4/auth/service/.*/api-key", Permission.USER_READ),
         Map.entry("POST:/v4/pipelines/.*/quality/check", Permission.DATA_QUALITY_READ),
+        Map.entry("POST:/v4/pipelines/.*/quality/ai-check", Permission.DATA_QUALITY_READ),
+        Map.entry("POST:/v4/pipelines/.*/quality/ai-validate", Permission.DATA_QUALITY_WRITE),
+        Map.entry("DELETE:/v4/pipelines/.*/quality/ai-baseline", Permission.DATA_QUALITY_WRITE),
         Map.entry("GET:/v4/pipelines/.*/quality/results", Permission.DATA_QUALITY_READ),
         Map.entry("DELETE:/v4/pipelines/.*/quality/results", Permission.DATA_QUALITY_WRITE)
     );

@@ -5,9 +5,11 @@ import io.debezium.v4.core.engine.DataQualityEngine;
 import io.debezium.v4.core.engine.PipelineEngine;
 import io.debezium.v4.core.validator.PipelineValidator;
 import io.debezium.v4.ai.mapping.MappingEngine;
+import io.debezium.v4.ai.quality.AIQualityService;
 import io.debezium.v4.monitoring.MetricsCollector;
 import io.debezium.v4.plugins.registry.PluginRegistry;
 import io.debezium.v4.api.auth.AuthenticationService;
+import io.debezium.v4.api.factory.AIQualityServiceFactory;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -31,6 +33,7 @@ public class PipelineResource {
     @Inject MetricsCollector metrics;
     @Inject PluginRegistry pluginRegistry;
     @Inject AuthenticationService authService;
+    @Inject AIQualityServiceFactory aiQualityFactory;
 
     @POST
     @Operation(summary = "Create a new pipeline")
@@ -141,11 +144,11 @@ public class PipelineResource {
         return Response.ok(Map.of("reEncrypted", count)).build();
     }
 
-    // --- Data Quality ---
+    // --- Data Quality (Rule-based + AI-enhanced) ---
 
     @POST
     @Path("/{id}/quality/check")
-    @Operation(summary = "Run data quality checks on pipeline")
+    @Operation(summary = "Run data quality checks on pipeline (rule-based + AI)")
     public Response runQualityCheck(@PathParam("id") String id, @HeaderParam("Authorization") String auth) {
         return engine.get(id).map(p -> {
             var config = p.dataQuality();
@@ -154,14 +157,111 @@ public class PipelineResource {
                     "results", List.of())).build();
             }
             List<Map<String, String>> sampleRecords = generateSampleRecords(p);
-            var results = dqEngine.runQualityCheck(id, config, sampleRecords);
-            return Response.ok(Map.of("pipelineId", id, "results", results, "total", results.size())).build();
+            List<QualityCheckResult> allResults = new ArrayList<>();
+            List<DataQualityRuleSpec> builtinRules = new ArrayList<>();
+            List<DataQualityRuleSpec> aiRules = new ArrayList<>();
+
+            for (var rule : config.rules()) {
+                if (isAIRuleType(rule.ruleType())) {
+                    aiRules.add(rule);
+                } else {
+                    builtinRules.add(rule);
+                }
+            }
+
+            var builtinConfig = new DataQualityConfig(config.enabled(), config.failOnError(),
+                config.mode(), builtinRules, config.globalOptions());
+            allResults.addAll(dqEngine.runQualityCheck(id, builtinConfig, sampleRecords));
+
+            if (!aiRules.isEmpty()) {
+                AIQualityService aiQuality = aiQualityFactory.get();
+                var aiConfig = new DataQualityConfig(config.enabled(), config.failOnError(),
+                    config.mode(), aiRules, config.globalOptions());
+                allResults.addAll(runAIChecks(aiQuality, id, aiConfig, sampleRecords, sampleRecords));
+            }
+
+            return Response.ok(Map.of("pipelineId", id, "results", allResults,
+                "total", allResults.size(), "aiEnabled", !aiRules.isEmpty())).build();
         }).orElse(Response.status(404).entity(Map.of("error", "Pipeline not found")).build());
+    }
+
+    @POST
+    @Path("/{id}/quality/ai-check")
+    @Operation(summary = "Run AI-only data quality checks (LLM + embeddings)")
+    public Response runAICheck(@PathParam("id") String id, @QueryParam("mode") @DefaultValue("all") String mode) {
+        return engine.get(id).map(p -> {
+            AIQualityService aiQuality = aiQualityFactory.get();
+            List<Map<String, String>> records = generateSampleRecords(p);
+            List<QualityCheckResult> results = new ArrayList<>();
+
+            switch (mode.toLowerCase()) {
+                case "anomaly" -> {
+                    var rule = DataQualityRuleSpec.builder().name("ai-anomaly-detection")
+                        .description("Embedding-based anomaly detection").ruleType("AI_ANOMALY")
+                        .scope("COLUMN").severity("WARN").threshold(20.0).build();
+                    results.add(aiQuality.detectAnomalies(rule, id, records));
+                }
+                case "semantic" -> {
+                    var rule = DataQualityRuleSpec.builder().name("ai-semantic-consistency")
+                        .description("Semantic consistency check using embeddings").ruleType("AI_SEMANTIC_CHECK")
+                        .scope("PIPELINE").severity("WARN").threshold(30.0).build();
+                    results.add(aiQuality.checkSemanticConsistency(rule, id, records));
+                }
+                case "drift" -> {
+                    var rule = DataQualityRuleSpec.builder().name("ai-schema-drift")
+                        .description("Schema drift detection using embedding centroids").ruleType("AI_SCHEMA_DRIFT")
+                        .scope("PIPELINE").severity("WARN").threshold(20.0).build();
+                    results.add(aiQuality.detectSchemaDrift(rule, id, records, List.of()));
+                }
+                default -> {
+                    results.add(aiQuality.detectAnomalies(
+                        DataQualityRuleSpec.builder().name("ai-anomaly-detection").ruleType("AI_ANOMALY").severity("WARN").build(), id, records));
+                    results.add(aiQuality.checkSemanticConsistency(
+                        DataQualityRuleSpec.builder().name("ai-semantic-consistency").ruleType("AI_SEMANTIC_CHECK").severity("WARN").build(), id, records));
+                    results.add(aiQuality.detectSchemaDrift(
+                        DataQualityRuleSpec.builder().name("ai-schema-drift").ruleType("AI_SCHEMA_DRIFT").severity("WARN").build(), id, records, List.of()));
+                }
+            }
+
+            dqEngine.storeResults(id, results);
+            return Response.ok(Map.of("pipelineId", id, "mode", mode, "results", results, "total", results.size())).build();
+        }).orElse(Response.status(404).entity(Map.of("error", "Pipeline not found")).build());
+    }
+
+    @POST
+    @Path("/{id}/quality/ai-validate")
+    @Operation(summary = "Validate records using LLM with a custom prompt")
+    public Response aiValidate(@PathParam("id") String id, AIValidateRequest req) {
+        return engine.get(id).map(p -> {
+            AIQualityService aiQuality = aiQualityFactory.get();
+            var rule = DataQualityRuleSpec.builder()
+                .name(req.name() != null ? req.name() : "llm-validation")
+                .description(req.description())
+                .ruleType("AI_VALIDATE")
+                .scope("ROW").column(req.column()).severity(req.severity() != null ? req.severity() : "WARN")
+                .expectedValue(req.expectedValue())
+                .predicate(req.predicate())
+                .configuration(req.configuration() != null ? req.configuration() : Map.of())
+                .threshold(req.threshold())
+                .build();
+            List<Map<String, String>> records = generateSampleRecords(p);
+            var result = aiQuality.validateWithLLM(rule, id, records);
+            dqEngine.storeResults(id, List.of(result));
+            return Response.ok(Map.of("pipelineId", id, "result", result)).build();
+        }).orElse(Response.status(404).entity(Map.of("error", "Pipeline not found")).build());
+    }
+
+    @DELETE
+    @Path("/{id}/quality/ai-baseline")
+    @Operation(summary = "Clear AI quality baseline data")
+    public Response clearAIBaseline(@PathParam("id") String id) {
+        aiQualityFactory.get().clearBaseline(id);
+        return Response.noContent().build();
     }
 
     @GET
     @Path("/{id}/quality/results")
-    @Operation(summary = "Get data quality check results")
+    @Operation(summary = "Get data quality check results (rule-based + AI)")
     public Response getQualityResults(@PathParam("id") String id,
             @QueryParam("limit") @DefaultValue("50") int limit,
             @QueryParam("failed") @DefaultValue("false") boolean failedOnly) {
@@ -197,6 +297,33 @@ public class PipelineResource {
             return Response.status(404).entity(Map.of("error", e.getMessage())).build();
         }
     }
+
+    private boolean isAIRuleType(String ruleType) {
+        return ruleType != null && (ruleType.startsWith("AI_") || ruleType.equals("CUSTOM_SQL"));
+    }
+
+    private List<QualityCheckResult> runAIChecks(AIQualityService aiQuality, String pipelineId,
+                                                   DataQualityConfig config,
+                                                   List<Map<String, String>> records,
+                                                   List<Map<String, String>> baselineRecords) {
+        List<QualityCheckResult> results = new ArrayList<>();
+        for (var rule : config.rules()) {
+            switch (rule.ruleType()) {
+                case "AI_VALIDATE" -> results.add(aiQuality.validateWithLLM(rule, pipelineId, records));
+                case "AI_ANOMALY" -> results.add(aiQuality.detectAnomalies(rule, pipelineId, records));
+                case "AI_SCHEMA_DRIFT" -> results.add(aiQuality.detectSchemaDrift(rule, pipelineId, records, baselineRecords));
+                case "AI_SEMANTIC_CHECK" -> results.add(aiQuality.checkSemanticConsistency(rule, pipelineId, records));
+                default -> results.add(QualityCheckResult.builder()
+                    .pipelineId(pipelineId).ruleName(rule.name()).ruleType(rule.ruleType())
+                    .passed(true).details(List.of("Unsupported AI rule type: " + rule.ruleType())).build());
+            }
+        }
+        return results;
+    }
+
+    public record AIValidateRequest(String name, String description, String column, String predicate,
+                                     String expectedValue, String severity, Double threshold,
+                                     Map<String, String> configuration) {}
 
     private List<Map<String, String>> generateSampleRecords(PipelineDefinition p) {
         List<Map<String, String>> records = new ArrayList<>();

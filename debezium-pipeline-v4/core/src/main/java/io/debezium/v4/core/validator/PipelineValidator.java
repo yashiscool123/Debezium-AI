@@ -73,7 +73,7 @@ public class PipelineValidator {
             if (isBlank(rule.name())) issues.add(error("dataQuality.rule.name", "Data quality rule name is required"));
             else if (!ruleNames.add(rule.name())) issues.add(error("dataQuality.rule." + rule.name(), "Duplicate rule name: " + rule.name()));
             if (isBlank(rule.ruleType())) issues.add(error("dataQuality.rule." + (rule.name() != null ? rule.name() : "?") + ".type", "Rule type is required"));
-            if (!List.of("NOT_NULL", "NOT_EMPTY", "REGEX", "RANGE", "EQUALS", "UNIQUE", "TYPE_CHECK", "MIN_LENGTH", "MAX_LENGTH", "COMPLETENESS", "ACCURACY", "CONSISTENCY", "TIMELINESS", "CUSTOM_SQL").contains(rule.ruleType()))
+            if (!List.of("NOT_NULL", "NOT_EMPTY", "REGEX", "RANGE", "EQUALS", "UNIQUE", "TYPE_CHECK", "MIN_LENGTH", "MAX_LENGTH", "COMPLETENESS", "ACCURACY", "CONSISTENCY", "TIMELINESS", "CUSTOM_SQL", "AI_VALIDATE", "AI_ANOMALY", "AI_SCHEMA_DRIFT", "AI_SEMANTIC_CHECK").contains(rule.ruleType()))
                 issues.add(warning("dataQuality.rule." + rule.name() + ".type", "Unknown rule type: " + rule.ruleType()));
             if (!List.of("ROW", "COLUMN", "TABLE", "PIPELINE").contains(rule.scope()))
                 issues.add(warning("dataQuality.rule." + rule.name() + ".scope", "Unknown scope: " + rule.scope()));
