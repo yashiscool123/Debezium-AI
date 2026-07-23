@@ -403,6 +403,64 @@ docker compose down
 ./target/debezium-pipeline-v4-4.0.1-runner
 ```
 
+### Accessing the Application
+
+Once running, the application is available at:
+
+| Interface | URL | Description |
+|---|---|---|
+| **REST API** | `http://localhost:8080/v4` | All pipeline, mapping, deployment, monitoring, and auth endpoints |
+| **Swagger UI** | `http://localhost:8080/v4/openapi` | Interactive API docs — try endpoints directly |
+| **Health Check** | `http://localhost:8080/q/health` | Service health and readiness |
+| **Prometheus** | `http://localhost:9090` | Metrics (requires `--profile monitoring` or `--profile full`) |
+| **Grafana** | `http://localhost:3000` | Dashboards (admin/admin, requires monitoring profile) |
+
+All API access requires authentication. Login first to get a session token:
+
+```bash
+curl -X POST http://localhost:8080/v4/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "<your-password>"}'
+# Response includes "sessionId" — use as Bearer token for all subsequent calls
+```
+
+### Working with Pipelines
+
+**List all pipelines:**
+```bash
+curl http://localhost:8080/v4/pipelines \
+  -H "Authorization: Bearer <session-id>"
+```
+
+**Filter by tenant or service user:**
+```bash
+curl "http://localhost:8080/v4/pipelines?tenant=default" \
+  -H "Authorization: Bearer <session-id>"
+
+curl "http://localhost:8080/v4/pipelines?serviceUser=my-svc-user" \
+  -H "Authorization: Bearer <session-id>"
+```
+
+**Get pipeline details + deployment status:**
+```bash
+curl http://localhost:8080/v4/pipelines/{id} \
+  -H "Authorization: Bearer <session-id>"
+
+curl http://localhost:8080/v4/pipelines/{id}/instance \
+  -H "Authorization: Bearer <session-id>"
+```
+
+**Pipeline status lifecycle:**
+```
+DRAFT → VALIDATING → VALID/INVALID → DEPLOYING → DEPLOYED → RUNNING
+                                                              ↓
+                                                         DEGRADED
+                                                              ↓
+                                                         FAILED/STOPPED
+                                                                  ↓
+                                                            ARCHIVED
+```
+
 ---
 
 ## Configuration
