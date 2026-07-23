@@ -438,6 +438,14 @@ Register custom plugins via CDI (`@ApplicationScoped`) or programmatically via `
 
 ---
 
+## Credits
+
+This project proudly uses the [Debezium](https://github.com/debezium/debezium) project (v3.7.0-SNAPSHOT) as its foundation. Debezium provides the core CDC engine, connectors for major databases (MySQL, PostgreSQL, MongoDB, Oracle, etc.), and the Pipeline API.
+
+Thanks to the Debezium community for creating a truly excellent CDC platform that enables us to build Debezium AI.
+
+---
+
 ## License
 
 Apache License 2.0 — see [LICENSE.txt](./debezium-main/LICENSE.txt) and [LICENSE-3rd-PARTIES.txt](./debezium-main/LICENSE-3rd-PARTIES.txt).
