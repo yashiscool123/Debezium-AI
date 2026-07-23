@@ -2,6 +2,10 @@
 
 Debezium AI is an intelligent Change Data Capture (CDC) pipeline generator that automates the creation, configuration, deployment, and monitoring of Debezium-based streaming pipelines. It uses AI/ML (embeddings, LLMs, vector search, and feedback learning) to automatically map source database schemas to target schemas, generate transformation chains, and produce ready-to-deploy artifacts for Kubernetes, Docker Compose, Strimzi, Helm, and Terraform.
 
+![Debezium Logo](https://raw.githubusercontent.com/debezium/debezium/main/documentation/modules/ROOT/assets/images/debezium-ui-48x48.png)
+
+**This project builds upon the [Debezium](https://github.com/debezium/debezium) platform — an open-source Change Data Capture platform for reliable CDC pipelines.**
+
 ---
 
 ## Table of Contents
