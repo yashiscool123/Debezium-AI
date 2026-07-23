@@ -221,8 +221,8 @@ The project has two implementations:
 | **OpenAPI** | SmallRye OpenAPI | SmallRye OpenAPI (annotated) |
 | **DI** | Quarkus Arc (CDI) | Quarkus Arc (CDI) |
 | **Debezium** | 3.7.0-SNAPSHOT | 3.7.0-SNAPSHOT |
-| **AI Embeddings** | debezium-ai-embeddings-minilm | Custom EmbeddingService (Provider interface) |
-| **LLM** | LangChain4j 0.32.1 | LangChain4j 0.35.0 |
+| **AI Embeddings** | debezium-ai-embeddings-minilm | EmbeddingService + 5 providers: MiniLM, Ollama, OpenAI, VoyageAI, HuggingFace |
+| **LLM** | LangChain4j 0.32.1 | LangChain4j 0.35.0 + 4 providers: Ollama, OpenAI, Anthropic, Google Gemini |
 | **Vector Store** | Not present | In-memory VectorStore |
 | **Feedback Training** | Not present | FeedbackTrainer |
 | **Monitoring** | SmallRye Health/Metrics | Dedicated monitoring module |
@@ -545,15 +545,52 @@ debezium.nosql.mongodb.config-collection=configurations
 
 ### Embedding Providers
 
-- **MiniLM** (local, default) — 384-dimensional, runs on CPU
-- **Ollama** — local embeddings via Ollama API
-- **VoyageAI** — cloud-based embeddings
-- **HuggingFace** — HuggingFace inference API
+| Provider | Default Model | Dimensions | Location | Config Key |
+|---|---|---|---|---|
+| **MiniLM** | `all-MiniLM-L6-v2` | 384 | Local (CPU) | `minilm` |
+| **Ollama** | `nomic-embed-text` | 768 | Local | `ollama` |
+| **OpenAI** | `text-embedding-ada-002` | 1536 | Cloud | `openai` |
+| **VoyageAI** | `voyage-code-2` | 1024 | Cloud | `voyageai` |
+| **HuggingFace** | `bert-base-uncased` | 768 | Cloud | `huggingface` |
+
+**Configuration example (OpenAI):**
+```properties
+debezium.ai.embeddings.provider=openai
+debezium.ai.embeddings.model=text-embedding-3-small
+debezium.ai.embeddings.api-key=${OPENAI_API_KEY}
+```
 
 ### LLM Providers
 
-- **Ollama** (default) — llama3.1, local inference
-- **OpenAI** — GPT models via API
+| Provider | Default Model | Location | Config Key |
+|---|---|---|---|
+| **Ollama** | `llama3.1` | Local | `ollama` |
+| **OpenAI** | `gpt-4o` | Cloud | `openai` |
+| **Anthropic** | `claude-3-opus-20240229` | Cloud | `anthropic` |
+| **Google Gemini** | `gemini-1.5-pro` | Cloud | `google` |
+
+**Configuration examples:**
+```properties
+# Ollama (default)
+debezium.ai.llm.provider=ollama
+debezium.ai.llm.model=llama3.1
+debezium.ai.llm.base-url=http://localhost:11434
+
+# OpenAI
+debezium.ai.llm.provider=openai
+debezium.ai.llm.model=gpt-4o
+debezium.ai.llm.api-key=${OPENAI_API_KEY}
+
+# Anthropic Claude
+debezium.ai.llm.provider=anthropic
+debezium.ai.llm.model=claude-3-opus-20240229
+debezium.ai.llm.api-key=${ANTHROPIC_API_KEY}
+
+# Google Gemini
+debezium.ai.llm.provider=google
+debezium.ai.llm.model=gemini-1.5-pro
+debezium.ai.llm.api-key=${GOOGLE_API_KEY}
+```
 
 ---
 

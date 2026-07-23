@@ -1,0 +1,30 @@
+package io.debezium.v4.ai.llm.providers;
+
+import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
+import io.debezium.v4.ai.llm.LLMService.LLMProvider;
+import java.time.Duration;
+
+public class GoogleLLMProvider implements LLMProvider {
+    private final GoogleAiGeminiChatModel model;
+    private final String modelName;
+
+    public GoogleLLMProvider(String apiKey, String modelName, String baseUrl, int timeoutMs) {
+        this.modelName = modelName;
+        var builder = GoogleAiGeminiChatModel.builder()
+            .apiKey(apiKey != null ? apiKey : System.getenv("GOOGLE_API_KEY"))
+            .modelName(modelName)
+            .timeout(Duration.ofMillis(timeoutMs))
+            .temperature(0.1)
+            .maxOutputTokens(4096);
+        if (baseUrl != null) builder.baseUrl(baseUrl);
+        this.model = builder.build();
+    }
+
+    @Override
+    public String generate(String prompt) {
+        return model.generate(prompt);
+    }
+
+    @Override
+    public String name() { return "google:" + modelName; }
+}
