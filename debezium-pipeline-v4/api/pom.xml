@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4</artifactId><version>4.0.0-SNAPSHOT</version></parent>
+    <artifactId>debezium-pipeline-v4-api</artifactId>
+    <name>Debezium Pipeline v4 API</name>
+    <dependencies>
+        <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-core</artifactId></dependency>
+        <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-ai</artifactId></dependency>
+        <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-monitoring</artifactId></dependency>
+        <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-plugins</artifactId></dependency>
+        <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-resteasy-reactive-jackson</artifactId></dependency>
+        <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-openapi</artifactId></dependency>
+        <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-health</artifactId></dependency>
+        <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-metrics</artifactId></dependency>
+        <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-arc</artifactId></dependency>
+    </dependencies>
+</project>

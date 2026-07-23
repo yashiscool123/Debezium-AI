@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.debezium</groupId>
+        <artifactId>debezium-parent</artifactId>
+        <version>3.7.0-SNAPSHOT</version>
+        <relativePath>../debezium-parent/pom.xml</relativePath>
+    </parent>
+    <artifactId>debezium-pipeline-v4</artifactId>
+    <version>4.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>Debezium Pipeline Generator v4</name>
+    <description>Next-gen CDC pipeline generator with AI/ML-driven source-to-target mapping</description>
+    <modules>
+        <module>core</module>
+        <module>ai</module>
+        <module>api</module>
+        <module>monitoring</module>
+        <module>plugins</module>
+    </modules>
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <quarkus.version>3.33.1.1</quarkus.version>
+        <langchain4j.version>0.35.0</langchain4j.version>
+        <debezium.version>3.7.0-SNAPSHOT</debezium.version>
+    </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-bom</artifactId><version>${quarkus.version}</version><type>pom</type><scope>import</scope></dependency>
+            <dependency><groupId>dev.langchain4j</groupId><artifactId>langchain4j-bom</artifactId><version>${langchain4j.version}</version><type>pom</type><scope>import</scope></dependency>
+            <dependency><groupId>io.debezium</groupId><artifactId>debezium-bom</artifactId><version>${debezium.version}</version><type>pom</type><scope>import</scope></dependency>
+            <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-core</artifactId><version>4.0.0-SNAPSHOT</version></dependency>
+            <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-ai</artifactId><version>4.0.0-SNAPSHOT</version></dependency>
+            <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-api</artifactId><version>4.0.0-SNAPSHOT</version></dependency>
+            <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-monitoring</artifactId><version>4.0.0-SNAPSHOT</version></dependency>
+            <dependency><groupId>io.debezium</groupId><artifactId>debezium-pipeline-v4-plugins</artifactId><version>4.0.0-SNAPSHOT</version></dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>
