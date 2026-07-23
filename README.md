@@ -171,7 +171,7 @@ The project has two implementations:
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│                         Debezium AI v4.0.3                                 │
+│                         Debezium AI v4.0.4                                 │
 ├───────────────────────────────────────────────────────────────────────────┤
 │  Auth / SSO / RBAC │  Pipelines │  Mappings │  Export/Import  │  Users   │
 ├──────────┬──────────┬──────────┬─────────────┬───────────────┬────────────┤
@@ -400,7 +400,7 @@ docker compose down
 
 ```bash
 ./mvnw package -Pnative
-./target/debezium-pipeline-v4-4.0.3-runner
+./target/debezium-pipeline-v4-4.0.4-runner
 ```
 
 ### Accessing the Application
@@ -670,14 +670,14 @@ The multi-stage `Dockerfile` builds an optimized container image using Quarkus n
 
 ```bash
 # Build the container image
-docker build -t debezium-ai:4.0.3 -f debezium-pipeline-v4/Dockerfile .
+docker build -t debezium-ai:4.0.4 -f debezium-pipeline-v4/Dockerfile .
 
 # Run with environment overrides
 docker run -p 8080:8080 \
   -e DEBEZIUM_AUTH_ENABLED=true \
   -e DEBEZIUM_AUTH_ADMIN_PASSWORD=<password> \
   -e DEBEZIUM_NOSQL_MONGODB_URI=mongodb://host.docker.internal:27017 \
-  debezium-ai:4.0.3
+  debezium-ai:4.0.4
 ```
 
 ---

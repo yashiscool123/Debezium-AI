@@ -31,7 +31,7 @@ Debezium AI is built on top of the Debezium CDC platform (v3.7.0-SNAPSHOT) and p
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
-│                         Debezium AI v4.0.3                                  │
+│                         Debezium AI v4.0.4                                  │
 ├──────────┬──────────┬──────────┬─────────────┬───────────────┬─────────────┤
 │   core   │    ai    │   api    │  monitoring  │   plugins     │   nosql     │
 │          │          │          │              │               │             │
