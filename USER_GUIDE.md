@@ -8,13 +8,40 @@ Debezium AI helps you create, manage, and monitor Change Data Capture (CDC) pipe
 
 ## Getting Started
 
+### Quick Install
+
+Choose your platform for one-click installation:
+
+**Linux / Mac:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/your-org/debezium-ai/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/your-org/debezium-ai/main/install.ps1 | iex
+```
+
+**Docker Compose (all platforms):**
+```bash
+# Full stack (Quarkus + Connect + Prometheus + Grafana)
+docker compose --profile full up -d
+
+# Development only (no monitoring)
+docker compose --profile dev up -d
+```
+
+The installer walks through: database connection, Debezium Connect URL, Ollama endpoint, admin credentials, SSO provider, and export directory.
+
 ### Accessing the Application
 
 Once deployed, access the application at:
 
-- **Web UI:** `http://localhost:8080/v4`
-- **API Docs:** `http://localhost:8080/v4/openapi`
+- **API Base URL:** `http://localhost:8080/v4`
+- **API Docs (Swagger UI):** `http://localhost:8080/v4/openapi`
 - **Health Check:** `http://localhost:8080/q/health`
+- **Prometheus Metrics:** `http://localhost:9090` (if monitoring profile enabled)
+- **Grafana Dashboards:** `http://localhost:3000` (admin/admin, if monitoring profile enabled)
 
 ### Default Credentials
 
@@ -213,19 +240,38 @@ curl -X POST http://localhost:8080/v4/export/import \
 
 ### SSO / Authentication
 
-To configure SSO:
+Debezium AI supports multiple authentication methods:
 
-1. **Keycloak / OIDC** — Set up in `application.properties`:
-```properties
-debezium.auth.type=oidc
-debezium.auth.oidc.issuer=https://keycloak.example.com/auth/realms/debezium
-debezium.auth.oidc.client-id=debezium-ai
-debezium.auth.oidc.client-secret=your-secret
+#### Username/Password Login
+```bash
+curl -X POST http://localhost:8080/v4/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password"}'
 ```
 
-2. **Google SSO** — Configure OAuth 2.0 credentials in Google Cloud Console
+#### SSO / OIDC Providers
 
-3. **GitHub SSO** — Register OAuth app in GitHub Developer Settings
+1. **Keycloak / OIDC**:
+```properties
+debezium.auth.sso.keycloak.url=https://keycloak.example.com
+debezium.auth.sso.keycloak.realm=debezium
+debezium.auth.sso.keycloak.client-id=debezium-ai
+debezium.auth.sso.keycloak.client-secret=your-secret
+```
+
+2. **Google SSO** — Configure OAuth 2.0 credentials in Google Cloud Console, set `debezium.auth.sso.google.client-id`
+
+3. **GitHub SSO** — Register OAuth app in GitHub Developer Settings, set `debezium.auth.sso.github.client-id`
+
+4. **Azure AD** — Register app in Azure Portal, set `debezium.auth.sso.azure.client-id`
+
+#### SSO Login Flow
+```bash
+# Redirect user to SSO provider
+curl -X POST http://localhost:8080/v4/auth/sso/google
+# After callback, exchange code for session token
+curl -X POST "http://localhost:8080/v4/auth/sso/google/callback?code=<auth-code>&redirect_uri=<redirect-uri>"
+```
 
 ---
 
@@ -291,6 +337,7 @@ curl -H "Authorization: Bearer <token>" http://localhost:8080/v4/audit
 | PUT | `/v4/pipelines/{id}` | Update pipeline |
 | DELETE | `/v4/pipelines/{id}` | Delete pipeline |
 | POST | `/v4/pipelines/{id}/deploy` | Deploy pipeline |
+| GET | `/v4/pipelines/{id}/instance` | Get deployment instance status |
 | POST | `/v4/pipelines/{id}/duplicate` | Duplicate pipeline |
 | POST | `/v4/pipelines/validate` | Validate pipeline config |
 
@@ -338,6 +385,98 @@ curl -H "Authorization: Bearer <token>" http://localhost:8080/v4/audit
 | POST | `/v4/users` | Create user |
 | PUT | `/v4/users/{username}` | Update user |
 | DELETE | `/v4/users/{username}` | Delete user |
+
+---
+
+## Installation & Configuration
+
+### Docker Compose Profiles
+
+| Profile | Services Included | Use Case |
+|---|---|---|
+| `dev` | Quarkus app | Lightweight development |
+| `full` | Quarkus + Connect + Prometheus + Grafana | Production-like environment |
+| `streaming` | Kafka + Debezium Connect | Streaming infrastructure only |
+| `monitoring` | Prometheus + Grafana | Monitoring stack only |
+
+```bash
+# Start with profile
+docker compose --profile full up -d
+
+# View logs for all services
+docker compose logs -f
+
+# Stop all services
+docker compose down
+```
+
+### SSO / Authentication Configuration
+
+To configure SSO, set these properties in `application.properties` or via environment variables:
+
+```properties
+# Enable authentication
+debezium.auth.enabled=true
+
+# JWT secret for session tokens
+debezium.auth.jwt.secret=<your-jwt-secret>
+
+# Keycloak
+debezium.auth.sso.keycloak.url=http://keycloak:8081
+debezium.auth.sso.keycloak.realm=debezium
+debezium.auth.sso.keycloak.client-id=debezium-ai
+
+# Google
+debezium.auth.sso.google.client-id=<google-client-id>
+
+# GitHub
+debezium.auth.sso.github.client-id=<github-client-id>
+
+# Azure AD
+debezium.auth.sso.azure.client-id=<azure-client-id>
+```
+
+### NoSQL Storage (MongoDB)
+
+For production deployments, configure a MongoDB backend for job history and configuration storage:
+
+```properties
+debezium.nosql.type=mongodb
+debezium.nosql.mongodb.uri=mongodb://mongo:27017
+debezium.nosql.mongodb.database=debezium_ai
+debezium.nosql.mongodb.job-collection=job_history
+debezium.nosql.mongodb.config-collection=configurations
+```
+
+### RBAC Roles and Permissions
+
+| Role | Permissions |
+|---|---|
+| SUPER_ADMIN | Full system access, user/tenant management |
+| ADMIN | Full access within tenant |
+| PIPELINE_MANAGER | CRUD + deploy pipelines |
+| PIPELINE_OPERATOR | Start/stop/monitor pipelines |
+| PIPELINE_VIEWER | Read-only pipeline access |
+| CONNECTOR_ADMIN | Manage connector configs |
+| DATA_ENGINEER | AI mappings, schema introspection, transforms |
+| AUDITOR | Read-only audit log access |
+| DEVELOPER | API access for integrations |
+
+### Production Deployment
+
+```bash
+# Build the container image
+docker build -t debezium-ai:4.0.1 -f debezium-pipeline-v4/Dockerfile .
+
+# Run with environment overrides
+docker run -p 8080:8080 \
+  -e DEBEZIUM_AUTH_ENABLED=true \
+  -e DEBEZIUM_AUTH_ADMIN_PASSWORD=<password> \
+  -e DEBEZIUM_NOSQL_MONGODB_URI=mongodb://host.docker.internal:27017 \
+  -e DEBEZIUM_EXPORT_DIRECTORY=/data/exports \
+  -v /host/data/exports:/data/exports \
+  debezium-ai:4.0.1
+```
 
 ---
 

@@ -1,10 +1,10 @@
 # Debezium AI — CDC Pipeline Generator with AI/ML Source-to-Target Mapping
 
-Debezium AI is an intelligent Change Data Capture (CDC) pipeline generator that automates the creation, configuration, deployment, and monitoring of Debezium-based streaming pipelines. It uses AI/ML (embeddings, LLMs, vector search, and feedback learning) to automatically map source database schemas to target schemas, generate transformation chains, and produce ready-to-deploy artifacts for Kubernetes, Docker Compose, Strimzi, Helm, and Terraform.
-
 ![Debezium Logo](https://raw.githubusercontent.com/debezium/debezium/main/documentation/modules/ROOT/assets/images/debezium-ui-48x48.png)
 
-**This project builds upon the [Debezium](https://github.com/debezium/debezium) platform — an open-source Change Data Capture platform for reliable CDC pipelines.**
+**Debezium AI** is an intelligent Change Data Capture (CDC) pipeline management platform that automates the creation, configuration, deployment, and monitoring of Debezium-based streaming pipelines. It uses AI/ML (embeddings, LLMs, vector search, and feedback learning) to automatically map source database schemas to target schemas, generate transformation chains, and produce ready-to-deploy artifacts for Kubernetes, Docker Compose, Strimzi, Helm, and Terraform.
+
+This project builds upon the [Debezium](https://github.com/debezium/debezium) platform — an open-source Change Data Capture platform for reliable CDC pipelines.
 
 ---
 
@@ -17,15 +17,21 @@ Debezium AI is an intelligent Change Data Capture (CDC) pipeline generator that 
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
+  - [Quick Install](#quick-install)
   - [Build](#build)
   - [Run](#run)
 - [Configuration](#configuration)
 - [API Reference](#api-reference)
+- [Authentication & RBAC](#authentication--rbac)
+- [Pipeline Export/Import & Releases](#pipeline-exportimport--releases)
+- [NoSQL Storage](#nosql-storage)
 - [AI/ML Pipeline Mapping](#aiml-pipeline-mapping)
 - [Deployment Formats](#deployment-formats)
+- [Installer & Deployment](#installer--deployment)
 - [Monitoring & Observability](#monitoring--observability)
 - [Plugin System](#plugin-system)
 - [v3 vs v4](#v3-vs-v4)
+- [Documentation](#documentation)
 - [License](#license)
 
 ---
@@ -39,13 +45,17 @@ Debezium AI sits on top of the Debezium CDC platform (v3.7.0-SNAPSHOT) and provi
 - **Multi-format deployment artifacts** — Generate YAML, Docker Compose, Helm charts, Terraform configs, and shell scripts for production deployments.
 - **Full lifecycle management** — Create, validate, deploy, monitor, and audit pipelines through a unified REST API.
 - **Plugin-based extensibility** — Add new connectors, transformations, or deployment formats via SPI.
+- **Enterprise security** — Username/password login, SSO/OIDC (Keycloak, Google, GitHub, Azure AD), and role-based access control with 9 granular roles.
+- **Multi-environment releases** — Export pipelines as JSON packages and promote across DEV, QA, and PROD environments.
+- **NoSQL storage** — Pluggable storage backend for job history, configurations, and pipeline metadata.
+- **One-click installer** — Interactive setup wizard for Windows (PowerShell), Linux/Mac (bash), and Docker Compose.
 
 The project has two implementations:
 
 | Version | Architecture | Notable Features |
 |---|--------|------|
 | **v3** (`debezium-pipeline-generator`) | Single Quarkus JAR | 14 model classes, 7 services, hardcoded connector types, schema introspection, heuristic + embedding mapping |
-| **v4** (`debezium-pipeline-v4`) | Multi-module Quarkus app | 5 modules (core/ai/api/monitoring/plugins), full SPI plugin system, feedback learning, vector store, audit logging, API security, multi-tenancy |
+| **v4** (`debezium-pipeline-v4`) | Multi-module Quarkus app | 5+ modules, full SPI plugin system, auth/SSO/RBAC, export/import, NoSQL storage, installer, monitoring module |
 
 ---
 
@@ -68,9 +78,46 @@ The project has two implementations:
 - **Schema introspection** — JDBC-based discovery of tables, columns, data types, primary keys, indexes, and foreign keys
 - **Type compatibility scoring** — Numeric, string, temporal, and boolean type groups with cross-type compatibility
 
+### Authentication & RBAC
+- **Username/Password Login** — Built-in authentication service with session management
+- **SSO / OIDC** — Keycloak, Google, GitHub, and Azure AD integration
+- **9 RBAC Roles** — SUPER_ADMIN, ADMIN, PIPELINE_MANAGER, PIPELINE_OPERATOR, PIPELINE_VIEWER, CONNECTOR_ADMIN, DATA_ENGINEER, AUDITOR, DEVELOPER
+- **Granular Permissions** — Per-endpoint authorization via `RBACFilter`
+- **Session Management** — Token-based sessions with expiry and tracking
+
+### Pipeline Export/Import & Releases
+- **Pipeline Export** — Export pipelines as JSON packages for environment promotion
+- **Release Packaging** — Bundle pipelines with metadata and release notes
+- **Environment Overrides** — Automatic configuration adjustment (DEV → QA → PROD)
+- **Import** — Restore pipelines from exported packages into target environments
+
+### NoSQL Storage
+- **Pluggable NoSqlStore Interface** — Swap storage backends without code changes
+- **Job History Store** — Track pipeline runs with status, metrics, errors, and duration
+- **Configuration Store** — Indexed configuration storage with field-based lookups
+- **MongoDB Implementation** — First-class MongoDB support for production deployments
+
+### One-Click Installer
+- **Interactive Setup Wizard (bash)** — Step-by-step configuration for Linux/Mac
+- **PowerShell Installer** — Windows-native setup with auto-configuration
+- **Docker Compose Profiles** — Single-command deployment (dev, full, streaming, monitoring)
+- **Production Dockerfile** — Multi-stage build for optimized container images
+- **Prometheus + Grafana** — Pre-configured monitoring stack in Docker Compose
+
 ### REST API (v4)
 | Endpoint | Purpose |
 |---|---|
+| `POST /v4/auth/login` | Login with username/password |
+| `POST /v4/auth/logout` | Logout and invalidate session |
+| `GET /v4/auth/session` | Validate current session |
+| `POST /v4/auth/sso/{provider}` | SSO login via OIDC provider |
+| `POST /v4/auth/register` | Register new user |
+| `GET /v4/users` | List all users |
+| `GET /v4/users/roles` | List roles with permissions |
+| `GET /v4/users/permissions` | List all permissions |
+| `POST /v4/users` | Create user |
+| `PUT /v4/users/{username}` | Update user |
+| `DELETE /v4/users/{username}` | Delete user |
 | `POST /v4/pipelines` | Create pipeline |
 | `GET /v4/pipelines` | List pipelines (with tenant filter) |
 | `GET /v4/pipelines/{id}` | Get pipeline |
@@ -87,6 +134,10 @@ The project has two implementations:
 | `GET /v4/connectors/{name}` | Connector details + config schema |
 | `POST /v4/deployments/generate` | Generate deployment artifacts |
 | `GET /v4/deployments/formats` | List deployment formats |
+| `POST /v4/export/pipelines` | Export pipelines as JSON |
+| `POST /v4/export/release` | Create release package |
+| `POST /v4/export/environment` | Export all pipelines for environment |
+| `POST /v4/export/import` | Import pipelines from JSON |
 | `GET /v4/metrics` | Pipeline metrics |
 | `GET /v4/metrics/summary` | Metric summary + recent alerts |
 | `POST /v4/metrics/alerts` | Evaluate alert rules |
@@ -119,37 +170,43 @@ The project has two implementations:
 ## Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                     Debezium AI Application                       │
-├──────────┬──────────┬──────────┬──────────┬──────────────────────┤
-│   core   │    ai    │   api    │monitoring│       plugins         │
-│          │          │          │          │                      │
-│ Models   │Mapping   │REST      │Metrics   │ConnectorPlugin       │
-│ Engine   │Engine    │Resources │Collector │TransformerPlugin     │
-│ Validator│Embedding │Security  │EventBus  │DeploymentPlugin      │
-│ SPI      │Service   │DTO       │Health    │PluginRegistry        │
-│          │LLMService│OpenAPI   │Dashboards│                      │
-│          │Vector    │          │Audit     │MySQL/Postgres/Mongo   │
-│          │Store     │          │          │Strimzi/Docker-Compose │
-│          │Feedback  │          │          │Filter/Drop/Rename     │
-│          │Trainer   │          │          │                      │
-├──────────┴──────────┴──────────┴──────────┴──────────────────────┤
-│                    Debezium Core (3.7.0)                          │
-│  API │ Config │ Common │ Connectors │ Storage │ Embedded │ Sink   │
-├──────────────────────────────────────────────────────────────────┤
-│                    JDBC / Kafka Connect / Kubernetes              │
-└──────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────┐
+│                         Debezium AI v4.0.1                                 │
+├───────────────────────────────────────────────────────────────────────────┤
+│  Auth / SSO / RBAC │  Pipelines │  Mappings │  Export/Import  │  Users   │
+├──────────┬──────────┬──────────┬─────────────┬───────────────┬────────────┤
+│   core   │    ai    │   api    │  monitoring  │   plugins     │   nosql    │
+│          │          │          │              │               │            │
+│ AuthSvc  │Mapping   │REST      │Metrics       │ConnectorPlugin│NoSqlStore  │
+│ UserSvc  │Engine    │Resources │Collector     │TransformerPln │JobHistory  │
+│ RBACFlt  │Embedding │DTO       │EventBus      │DeploymentPln  │ConfigStore │
+│ Pipeline │LLMService│OpenAPI   │Health        │PluginRegistry │MongoDBImpl │
+│ Export   │Vector    │Auth      │Dashboards    │               │            │
+│ Release  │Store     │Export    │Audit         │MySQL/Postgres │            │
+│ NoSqlInt │Feedback  │          │              │Docker/Strimzi │            │
+├──────────┴──────────┴──────────┴──────────────┴───────────────┴────────────┤
+│                         Debezium Core (3.7.0)                               │
+│  API │ Config │ Common │ Connectors │ Storage │ Embedded │ Sink              │
+├────────────────────────────────────────────────────────────────────────────┤
+│                     JDBC / Kafka Connect / Kubernetes                       │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Pipeline Flow
 ```
-1. Define Pipeline ──> 2. Schema Introspection ──> 3. AI Mapping ──> 4. Transform
-   (source/target,      (JDBC metadata          (embeddings + LLM    Chain Build
-    kafka config)        discovery)               + feedback)         (SMT + KSQL)
+1. Authenticate ──> 2. Define Pipeline ──> 3. Schema Introspection ──> 4. AI Mapping
+   (login / SSO,    (source/target,      (JDBC metadata            (embeddings + LLM
+    RBAC check)      kafka config)        discovery)                 + feedback)
 
-5. Validate ──> 6. Generate Artifacts ──> 7. Deploy ──> 8. Monitor
-   (config +      (Docker/K8s/Helm/       (via API or    (metrics + health
-    connection)     Strimzi/Terraform)      external)      + audit)
+5. Transform ──> 6. Validate ──> 7. Export/Release ──> 8. Generate Artifacts
+   Chain Build    (config,         (JSON package,        (YAML, Helm,
+   (SMT + KSQL)    schema,          environment           Terraform, Scripts)
+                   connectivity)    promotion)
+
+9. Deploy ──> 10. Monitor ──> 11. Job History
+   (K8s, Docker    (metrics,        (NoSqlStore -
+    Compose,        alerts,          persisted run
+    Strimzi)        dashboards)      records)
 ```
 
 ---
@@ -173,6 +230,11 @@ The project has two implementations:
 | **Build** | Maven + Quarkus plugin | Maven + Quarkus plugin |
 | **Serialization** | Jackson (JSON + YAML) | Jackson (JSON + YAML) |
 | **Database Drivers** | PostgreSQL, MySQL, SQL Server, MariaDB, Oracle | PostgreSQL, MySQL, SQL Server, MariaDB, Oracle |
+| **Auth / SSO** | — | AuthService + OIDC (Keycloak, Google, GitHub, Azure AD) |
+| **RBAC** | — | 9 roles, Permission-based RBACFilter |
+| **Export/Import** | — | JSON export/import + release packaging |
+| **NoSQL Storage** | — | Pluggable NoSqlStore (MongoDB impl) |
+| **Installer** | — | Bash + PowerShell + Docker Compose profiles |
 
 ---
 
@@ -217,14 +279,19 @@ Debezium AI/
 │
 └── debezium-pipeline-v4/                       # v4 — Multi-module Quarkus app
     ├── pom.xml                                 # Parent POM
-    ├── core/                                   # Models, Engine, Validator, SPI
+    ├── core/                                   # Models, Engine, Validator, SPI, Auth, Export
+    │   ├── src/main/java/.../core/auth/        # AuthService, UserService, RBACFilter
+    │   ├── src/main/java/.../core/export/      # ExportService, ReleaseService
+    │   └── src/main/java/.../core/nosql/       # NoSqlStore interface
     ├── ai/                                     # Mapping, Embeddings, LLM, Vector Store, Training
     ├── api/                                    # REST Resources, Security, DTO
     ├── monitoring/                             # Metrics, Dashboards, Events, Health, Audit
-    └── plugins/                                # Plugin Registry + Built-in Plugins
-        ├── connectors/builtin/                 # MySQL, Postgres, MongoDB plugins
-        ├── transformers/builtin/               # Filter, Drop, Rename, ContentRouter plugins
-        └── deployment/                         # Strimzi, Docker Compose deployment plugins
+    ├── plugins/                                # Plugin Registry + Built-in Plugins
+    │   ├── connectors/builtin/                 # MySQL, Postgres, MongoDB plugins
+    │   ├── transformers/builtin/               # Filter, Drop, Rename, ContentRouter plugins
+    │   └── deployment/                         # Strimzi, Docker Compose deployment plugins
+    └── nosql/                                  # NoSQL storage implementations
+        └── mongodb/                            # MongoDB NoSqlStore, JobHistoryStore, ConfigStore
 ```
 
 ---
@@ -237,6 +304,38 @@ Debezium AI/
 - Maven 3.9+
 - Docker (for integration tests)
 - Ollama (optional, for local LLM features)
+- **SSO (optional)** — Keycloak, or OIDC provider credentials for Google/GitHub/Azure AD
+
+### Quick Install
+
+Use the interactive installer to set up the full stack (Quarkus app + Debezium Connect + Prometheus + Grafana):
+
+**Linux / Mac:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/your-org/debezium-ai/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/your-org/debezium-ai/main/install.ps1 | iex
+```
+
+**Docker Compose (all platforms):**
+```bash
+# Full stack (default)
+docker compose --profile full up -d
+
+# Development only (no monitoring)
+docker compose --profile dev up -d
+
+# Streaming + monitoring
+docker compose --profile streaming up -d
+
+# Monitoring stack only
+docker compose --profile monitoring up -d
+```
+
+The installer walks through configuration options: database connection, Debezium Connect URL, Ollama endpoint, admin credentials, SSO provider, and export directory.
 
 ### Build
 
@@ -284,11 +383,24 @@ cd debezium-pipeline-v4
 
 Access at: `http://localhost:8080/v4`
 
+#### Run with Docker Compose (production-like)
+
+```bash
+# Start all services (Quarkus, Debezium Connect, Prometheus, Grafana)
+docker compose --profile full up -d
+
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
+```
+
 #### Run as native executable
 
 ```bash
 ./mvnw package -Pnative
-./target/debezium-pipeline-v4-4.0.0-SNAPSHOT-runner
+./target/debezium-pipeline-v4-4.0.1-runner
 ```
 
 ---
@@ -314,8 +426,37 @@ debezium.schema-registry.url=http://localhost:8081
 
 ```properties
 quarkus.http.port=8080
-debezium.api.key=<your-api-key>   # Enables API key authentication
-debezium.plugins.scan-cdi=true    # Auto-detect plugin CDI beans
+debezium.api.key=<your-api-key>         # Enables API key authentication
+debezium.plugins.scan-cdi=true          # Auto-detect plugin CDI beans
+
+# --- Authentication ---
+debezium.auth.enabled=true              # Enable auth/SSO/RBAC
+debezium.auth.jwt.secret=<jwt-secret>   # JWT signing secret
+debezium.auth.session.ttl=3600          # Session TTL in seconds
+
+# --- SSO / OIDC ---
+debezium.auth.sso.keycloak.url=http://localhost:8081
+debezium.auth.sso.keycloak.realm=debezium
+debezium.auth.sso.keycloak.client-id=debezium-ai
+debezium.auth.sso.keycloak.client-secret=<secret>
+debezium.auth.sso.google.client-id=<google-client-id>
+debezium.auth.sso.github.client-id=<github-client-id>
+debezium.auth.sso.azure.client-id=<azure-client-id>
+
+# --- RBAC Default Admin ---
+debezium.auth.admin.username=admin
+debezium.auth.admin.password=<admin-password>
+
+# --- Export / Release ---
+debezium.export.directory=./exports     # Export output directory
+debezium.export.release.prefix=release  # Release package prefix
+
+# --- NoSQL Storage ---
+debezium.nosql.type=mongodb             # Storage backend type
+debezium.nosql.mongodb.uri=mongodb://localhost:27017
+debezium.nosql.mongodb.database=debezium_ai
+debezium.nosql.mongodb.job-collection=job_history
+debezium.nosql.mongodb.config-collection=configurations
 ```
 
 ---
@@ -395,6 +536,54 @@ The v4 monitoring module provides production-grade observability:
 - **EventBus** — Pub/sub for internal events with 5,000-event history.
 - **DashboardManager** — Create monitoring dashboards with widgets (COUNTER, TIME_SERIES, TABLE, PIE_CHART, BAR_CHART, HEAT_MAP, TOPOLOGY, LOG_VIEWER, STATUS_INDICATOR).
 - **AuditLogger** — Track all user actions with entity type, user ID, and details (10,000-entry history).
+- **Job History** — Pipeline run records persisted via NoSqlStore (MongoDB) for long-term analysis.
+- **Prometheus + Grafana** — Pre-configured monitoring stack in Docker Compose (`--profile monitoring` or `--profile full`).
+
+---
+
+## Installer & Deployment
+
+Debezium AI includes an interactive installer for one-click setup across platforms:
+
+### Installer Options
+
+| Platform | Script | Features |
+|---|---|---|
+| **Linux / Mac** | `install.sh` (bash) | Step-by-step wizard, Docker Compose profiles, auto-detection |
+| **Windows** | `install.ps1` (PowerShell) | Native Windows setup with admin prompt |
+| **All Platforms** | `docker-compose.yml` | Pre-configured profiles (dev, full, streaming, monitoring) |
+
+### Docker Compose Profiles
+
+```bash
+# All services (Quarkus + Connect + Prometheus + Grafana)
+docker compose --profile full up -d
+
+# Quarkus app only (lightweight dev)
+docker compose --profile dev up -d
+
+# Debezium Connect + streaming setup
+docker compose --profile streaming up -d
+
+# Prometheus + Grafana only
+docker compose --profile monitoring up -d
+```
+
+### Production Dockerfile
+
+The multi-stage `Dockerfile` builds an optimized container image using Quarkus native compilation:
+
+```bash
+# Build the container image
+docker build -t debezium-ai:4.0.1 -f debezium-pipeline-v4/Dockerfile .
+
+# Run with environment overrides
+docker run -p 8080:8080 \
+  -e DEBEZIUM_AUTH_ENABLED=true \
+  -e DEBEZIUM_AUTH_ADMIN_PASSWORD=<password> \
+  -e DEBEZIUM_NOSQL_MONGODB_URI=mongodb://host.docker.internal:27017 \
+  debezium-ai:4.0.1
+```
 
 ---
 
@@ -425,16 +614,30 @@ Register custom plugins via CDI (`@ApplicationScoped`) or programmatically via `
 
 | Feature | v3 | v4 |
 |---|---|---|
-| **Architecture** | Single JAR | 5 modules (core/ai/api/monitoring/plugins) |
+| **Architecture** | Single JAR | 7 modules (core/ai/api/monitoring/plugins/nosql/installer) |
 | **Plugin System** | Hardcoded connector types | SPI + PluginRegistry + CDI scanning |
 | **AI Mapping** | Heuristic + embedding similarity | Embeddings + LLM + vector store + feedback training |
 | **Monitoring** | SmallRye Health/Metrics | Dedicated module (metrics, dashboards, event bus, audit, health) |
-| **API Security** | None | API key authentication |
+| **API Security** | None | API key + username/password login + SSO/OIDC |
+| **RBAC** | None | 9 granular roles with permission-based access control |
 | **Multi-Tenancy** | None | Tenant-aware filtering |
 | **Pipeline Lifecycle** | 8 status states | 11 status states with instance tracking |
+| **Export/Import** | None | JSON export/import + environment promotion + release packaging |
+| **NoSQL Storage** | None | Pluggable NoSqlStore with MongoDB implementation |
+| **Installer** | None | Interactive bash + PowerShell + Docker Compose profiles |
 | **Response Format** | Raw Map responses | Unified ApiResponse<T> wrapper |
 | **OpenAPI** | Basic | Full annotations (Operation, Tag, APIResponse) |
 | **Deployment Artifacts** | Hardcoded generator | Plugin-based generation (extensible) |
+
+---
+
+## Documentation
+
+| Guide | Description |
+|---|---|
+| [Developer Guide](./DEVELOPER_GUIDE.md) | Architecture, build setup, coding conventions, module walkthrough |
+| [User Guide](./USER_GUIDE.md) | REST API, authentication, pipeline lifecycle, configuration reference |
+| [AGENTS.md](./AGENTS.md) | Guidelines for AI coding assistants and agents contributing to the project |
 
 ---
 

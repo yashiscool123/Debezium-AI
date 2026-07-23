@@ -8,11 +8,14 @@ This document provides comprehensive guidance for developers working on the Debe
 
 - [Architecture Overview](#architecture-overview)
 - [Module Structure](#module-structure)
-- [Core Module](core-module)
+- [Core Module](#core-module)
 - [AI Module](#ai-module)
 - [API Module](#api-module)
 - [Monitoring Module](#monitoring-module)
 - [Plugins Module](#plugins-module)
+- [NoSQL Module](#nosql-module)
+- [Authentication & RBAC](#authentication--rbac)
+- [Pipeline Export/Import](#pipeline-exportimport)
 - [Code Standards](#code-standards)
 - [Testing Guidelines](#testing-guidelines)
 - [Deployment Process](#deployment-process)
@@ -27,35 +30,34 @@ Debezium AI is built on top of the Debezium CDC platform (v3.7.0-SNAPSHOT) and p
 ### High-Level Architecture
 
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│                      Debezium AI Application                        │
-├──────────┬──────────┬──────────┬──────────┬──────────────────────┤
-│   core   │    ai    │   api    │monitoring│       plugins         │
-│          │          │          │          │                      │
-│ Models   │Mapping   │REST      │Metrics   │ConnectorPlugin       │
-│ Engine   │Engine    │Resources │Collector │TransformerPlugin     │
-│ Validator│Embedding │Security  │EventBus  │DeploymentPlugin      │
-│ SPI      │Service   │DTO       │Health    │PluginRegistry        │
-│          │LLMService│OpenAPI   │Dashboards│                      │
-│          │Vector    │          │Audit     │MySQL/Postgres/Mongo   │
-│          │Store     │          │          │Strimzi/Docker-Compose │
-│          │Feedback  │          │          │Filter/Drop/Rename     │
-│          │Trainer   │          │          │                      │
-├──────────┴──────────┴──────────┴──────────┴──────────────────────┤
-│                    Debezium Core (3.7.0)                          │
-│  API │ Config │ Common │ Connectors │ Storage │ Embedded │ Sink   │
-├───────────────────────────────────────────────────────────────────┤
-│                    JDBC / Kafka Connect / Kubernetes              │
-└───────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         Debezium AI v4.0.1                                  │
+├──────────┬──────────┬──────────┬─────────────┬───────────────┬─────────────┤
+│   core   │    ai    │   api    │  monitoring  │   plugins     │   nosql     │
+│          │          │          │              │               │             │
+│ AuthSvc  │Mapping   │REST      │Metrics       │ConnectorPlugin│NoSqlStore   │
+│ UserSvc  │Engine    │Resources │Collector     │TransformerPln │JobHistory   │
+│ RBACFlt  │Embedding │DTO       │EventBus      │DeploymentPln  │ConfigStore  │
+│ Pipeline │LLMService│OpenAPI   │Health        │PluginRegistry │MongoDBImpl  │
+│ Export   │Vector    │Auth      │Dashboards    │               │             │
+│ Release  │Store     │Export    │Audit         │MySQL/Postgres │             │
+│ NoSqlInt │Feedback  │          │              │Docker/Strimzi │             │
+├──────────┴──────────┴──────────┴──────────────┴───────────────┴─────────────┤
+│                         Debezium Core (3.7.0)                               │
+│  API │ Config │ Common │ Connectors │ Storage │ Embedded │ Sink              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                     JDBC / Kafka Connect / Kubernetes                        │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Module Interactions
 
-1. **core module** provides data models, pipeline engine, validation, and SPI interfaces
+1. **core module** provides data models, pipeline engine, validation, SPI interfaces, authentication, authorization (RBAC), and export/import services
 2. **ai module** generates schema mappings using embeddings and LLM suggestions
 3. **api module** exposes all functionality through REST endpoints with security
 4. **monitoring module** collects metrics, provides health checks, and tracks events/audits
 5. **plugins module** implements connectors, transformers, and deployment plugins
+6. **nosql module** provides pluggable storage backends (MongoDB) for job history and configuration
 
 ### Communication Flow
 
@@ -631,7 +633,173 @@ spec:
 
 **Output:** `docker-compose.yml` for development/testing
 
-### Code Standards
+### 6. NoSQL Module (`debezium-pipeline-v4-nosql`)
+
+**Package:** `io.debezium.v4.nosql`
+
+**Purpose:** Pluggable storage backend for persisting pipeline job history and configuration data.
+
+**Key Components:**
+
+#### 6.1 NoSqlStore Interface
+
+**File:** `io.debezium.v4.core.nosql.NoSqlStore`
+
+```java
+public interface NoSqlStore {
+    void store(String collection, String key, Map<String, Object> data);
+    Optional<Map<String, Object>> retrieve(String collection, String key);
+    List<Map<String, Object>> query(String collection, Map<String, Object> filters);
+    void delete(String collection, String key);
+    boolean exists(String collection, String key);
+}
+```
+
+#### 6.2 JobHistoryStore
+
+**Class:** `io.debezium.v4.nosql.JobHistoryStore`
+
+**Purpose:** Persist pipeline execution records for long-term analysis and debugging.
+
+**Recorded fields:**
+- Pipeline ID and name
+- Start/end timestamps and duration
+- Status (SUCCESS, FAILED, RUNNING)
+- Error messages and stack traces
+- Metrics snapshot at completion
+
+#### 6.3 ConfigStore
+
+**Class:** `io.debezium.v4.nosql.ConfigStore`
+
+**Purpose:** Indexed configuration storage with field-based lookups.
+
+**Features:**
+- JSON document storage
+- Field-level indexing for fast queries
+- TTL-based expiration for temporary configs
+
+#### 6.4 MongoDB Implementation
+
+**Class:** `io.debezium.v4.nosql.mongodb.MongoDbNoSqlStore`
+
+**Dependency:** MongoDB driver 4.x
+
+**Configuration:**
+```properties
+debezium.nosql.type=mongodb
+debezium.nosql.mongodb.uri=mongodb://localhost:27017
+debezium.nosql.mongodb.database=debezium_ai
+debezium.nosql.mongodb.job-collection=job_history
+debezium.nosql.mongodb.config-collection=configurations
+```
+
+---
+
+## Authentication & RBAC
+
+### AuthService
+
+**Package:** `io.debezium.v4.core.auth`
+
+**Purpose:** Handle user authentication via username/password and SSO/OIDC providers.
+
+**Key Methods:**
+```java
+public AuthSession login(String username, String password)
+public AuthSession ssoLogin(String provider, String code, String redirectUri)
+public void logout(String sessionId)
+public Optional<AuthSession> validateSession(String sessionId)
+public User register(String username, String password, String email)
+```
+
+### UserService
+
+**Package:** `io.debezium.v4.core.auth`
+
+**Purpose:** Manage users, roles, and permissions.
+
+**Key Methods:**
+```java
+public User createUser(User user)
+public User updateUser(String username, User user)
+public void deleteUser(String username)
+public List<User> listUsers()
+public List<Role> listRoles()
+public List<Permission> listPermissions()
+public Optional<User> getUser(String username)
+```
+
+### RBACFilter
+
+**Package:** `io.debezium.v4.core.auth`
+
+**Purpose:** JAX-RS ContainerRequestFilter that enforces role-based access on every endpoint.
+
+**RBAC Role Hierarchy:**
+| Role | Key Permissions |
+|---|---|
+| SUPER_ADMIN | Full system access, tenant management, user management |
+| ADMIN | Full access within tenant |
+| PIPELINE_MANAGER | CRUD + deploy pipelines |
+| PIPELINE_OPERATOR | Start/stop/monitor pipelines |
+| PIPELINE_VIEWER | Read-only pipeline access |
+| CONNECTOR_ADMIN | Manage connector configurations |
+| DATA_ENGINEER | AI mappings, schema introspection, transforms |
+| AUDITOR | Read-only audit log access |
+| DEVELOPER | API access for integrations |
+
+### SSO/OIDC Integration
+
+Supports Keycloak, Google, GitHub, and Azure AD:
+
+```properties
+debezium.auth.sso.keycloak.url=http://localhost:8081
+debezium.auth.sso.keycloak.realm=debezium
+debezium.auth.sso.keycloak.client-id=debezium-ai
+debezium.auth.sso.keycloak.client-secret=<secret>
+debezium.auth.sso.google.client-id=<google-client-id>
+debezium.auth.sso.github.client-id=<github-client-id>
+debezium.auth.sso.azure.client-id=<azure-client-id>
+```
+
+---
+
+## Pipeline Export/Import
+
+**Package:** `io.debezium.v4.core.export`
+
+**Purpose:** Serialize pipelines to JSON packages for environment promotion and release management.
+
+### ExportService
+
+**Class:** `io.debezium.v4.core.export.ExportService`
+
+```java
+public PipelineExportRecord exportPipelines(List<String> pipelineIds, String sourceEnv, String targetEnv)
+public ReleasePackage createRelease(List<String> pipelineIds, String version, String releaseNotes)
+public PipelineExportRecord exportEnvironment(String environment)
+public List<PipelineDefinition> importPipelines(String json, String targetEnvironment)
+```
+
+### PipelineExportRecord
+
+**Fields:** pipeline IDs, source/target environment, exported at timestamp, pipeline definitions with environment overrides
+
+### ReleasePackage
+
+**Fields:** version, release notes, pipeline definitions, metadata, created at timestamp
+
+### Environment Overrides
+
+Configuration values are automatically adjusted when promoting across environments:
+- `database.hostname`: `dev-db` → `qa-db` → `prod-db`
+- `bootstrap.servers`: `dev-kafka:9092` → `qa-kafka:9092` → `prod-kafka:9092`
+- `topic.prefix`: `dev.` → `qa.` → `prod.`
+
+---
+
+## Code Standards
 
 #### Java Coding Standards
 
@@ -643,8 +811,8 @@ spec:
 
 #### Security Best Practices
 
-- **Authentication:** API key authentication, no hardcoded secrets
-- **Authorization:** Role-based access control (RBAC) - in progress
+- **Authentication:** API key + username/password + SSO/OIDC, no hardcoded secrets
+- **Authorization:** Fully implemented RBAC with 9 roles and per-endpoint permission checking
 - **Input validation:** Comprehensive validation for all API endpoints
 - **Error handling:** Generic error messages to clients, detailed logs internally
 - **Logging:** Audit logging for all sensitive operations
@@ -683,8 +851,24 @@ quarkus.http.port=8080
 # API authentication
 debezium.api.key=${API_KEY}
 
+# Auth / SSO / RBAC
+debezium.auth.enabled=true
+debezium.auth.jwt.secret=${JWT_SECRET}
+debezium.auth.admin.username=admin
+debezium.auth.admin.password=${ADMIN_PASSWORD}
+debezium.auth.sso.keycloak.url=http://localhost:8081
+debezium.auth.sso.keycloak.realm=debezium
+
 # Plugin registry
 debezium.plugins.scan-cdi=true
+
+# Export
+debezium.export.directory=./exports
+
+# NoSQL Storage
+debezium.nosql.type=mongodb
+debezium.nosql.mongodb.uri=mongodb://localhost:27017
+debezium.nosql.mongodb.database=debezium_ai
 
 # Monitoring
 prometheus.metrics.enabled=true
@@ -700,6 +884,11 @@ debezium.ai.llm.provider=ollama
 | Variable | Default | Description |
 |---|---|---|
 | `DEBEZIUM_API_KEY` | Required | API key for authentication |
+| `DEBEZIUM_AUTH_ENABLED` | true | Enable auth/SSO/RBAC |
+| `DEBEZIUM_AUTH_JWT_SECRET` | Required | JWT signing secret |
+| `DEBEZIUM_AUTH_ADMIN_PASSWORD` | Required | Default admin password |
+| `DEBEZIUM_NOSQL_MONGODB_URI` | `mongodb://localhost:27017` | MongoDB connection URI |
+| `DEBEZIUM_EXPORT_DIRECTORY` | `./exports` | Export output directory |
 | `DB_HOST` | localhost | Database host for schema introspection |
 | `DB_PORT` | Connector-specific | Database port |
 | `DB_USER` | connector-specific | Database username |
@@ -710,10 +899,12 @@ debezium.ai.llm.provider=ollama
 #### Breaking Changes
 
 1. **API Base Path:** `/api/v1` → `/v4`
-2. **Authentication:** Now required (previously none)
-3. **Response Format:** Maps → Unified ApiResponse wrapper
-4. **Plugin System:** Hardcoded connectors → SPI with registry
-5. **Mapping Algorithm:** Heuristic only → AI (embeddings + LLM)
+2. **Authentication:** Now required (previously none) — supports username/password + SSO + API key
+3. **RBAC:** Authorization enforced for all endpoints (9 roles)
+4. **Response Format:** Maps → Unified ApiResponse wrapper
+5. **Plugin System:** Hardcoded connectors → SPI with registry
+6. **Mapping Algorithm:** Heuristic only → AI (embeddings + LLM)
+7. **New Modules:** nosql, auth, export modules add runtime dependencies (MongoDB optional)
 
 #### Migration Steps
 
@@ -722,6 +913,9 @@ debezium.ai.llm.provider=ollama
 3. Update client code to handle ApiResponse wrapper
 4. Update plugin discovery: Scan for `@ApplicationScoped` annotations
 5. Update mapping logic: Use `/v4/mappings/suggest` endpoint
+6. (Optional) Configure MongoDB for NoSQL storage: add `debezium.nosql.mongodb.uri`
+7. (Optional) Configure SSO providers: add `debezium.auth.sso.*` properties
+8. Update deployment pipeline to include export step in CI/CD
 
 #### Compatibility
 
