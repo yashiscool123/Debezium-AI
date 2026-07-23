@@ -466,7 +466,7 @@ debezium.nosql.mongodb.config-collection=configurations
 
 ```bash
 # Build the container image
-docker build -t debezium-ai:4.0.2 -f debezium-pipeline-v4/Dockerfile .
+docker build -t debezium-ai:4.0.3 -f debezium-pipeline-v4/Dockerfile .
 
 # Run with environment overrides
 docker run -p 8080:8080 \
@@ -475,7 +475,7 @@ docker run -p 8080:8080 \
   -e DEBEZIUM_NOSQL_MONGODB_URI=mongodb://host.docker.internal:27017 \
   -e DEBEZIUM_EXPORT_DIRECTORY=/data/exports \
   -v /host/data/exports:/data/exports \
-  debezium-ai:4.0.2
+  debezium-ai:4.0.3
 ```
 
 ---
