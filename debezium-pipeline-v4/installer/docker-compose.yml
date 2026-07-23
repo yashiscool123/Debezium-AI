@@ -1,0 +1,189 @@
+version: '3.8'
+
+# ===============================================================
+# Debezium AI — Docker Compose Deployment
+# ===============================================================
+# One-command setup: docker compose up -d
+# ===============================================================
+
+services:
+  # ---------------------------------------------------------------
+  # Debezium AI Application
+  # ---------------------------------------------------------------
+  debezium-ai:
+    build:
+      context: ..
+      dockerfile: installer/Dockerfile
+    image: debezium-ai:4.0.1
+    container_name: debezium-ai
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - QUARKUS_HTTP_PORT=8080
+      - DEBEZIUM_API_KEY=${API_KEY}
+      - DEBEZIUM_AUTH_TYPE=${AUTH_TYPE:-local}
+      - DEBEZIUM_STORAGE_TYPE=${STORAGE_TYPE:-memory}
+      - JAVA_OPTS=-Xms512m -Xmx2g
+    volumes:
+      - debezium-ai-data:/app/data
+    depends_on:
+      - postgres
+      - mongodb
+    networks:
+      - debezium-ai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------
+  # PostgreSQL (for production storage)
+  # ---------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: debezium-ai-postgres
+    environment:
+      - POSTGRES_DB=debezium_ai
+      - POSTGRES_USER=debezium
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-debezium}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - debezium-ai-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - production
+
+  # ---------------------------------------------------------------
+  # MongoDB (for NoSQL job history & configs)
+  # ---------------------------------------------------------------
+  mongodb:
+    image: mongo:7
+    container_name: debezium-ai-mongodb
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=debezium
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_PASSWORD:-debezium}
+      - MONGO_INITDB_DATABASE=debezium_ai
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - debezium-ai-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - production
+
+  # ---------------------------------------------------------------
+  # Kafka + Zookeeper (for streaming)
+  # ---------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: debezium-ai-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - debezium-ai-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - streaming
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: debezium-ai-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - debezium-ai-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - streaming
+
+  # ---------------------------------------------------------------
+  # Debezium Connect (for CDC execution)
+  # ---------------------------------------------------------------
+  debezium-connect:
+    image: debezium/connect:3.7
+    container_name: debezium-ai-connect
+    depends_on:
+      - kafka
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: debezium-ai
+      CONFIG_STORAGE_TOPIC: debezium-connect-configs
+      OFFSET_STORAGE_TOPIC: debezium-connect-offsets
+      STATUS_STORAGE_TOPIC: debezium-connect-status
+    networks:
+      - debezium-ai-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - streaming
+
+  # ---------------------------------------------------------------
+  # Prometheus (for metrics collection)
+  # ---------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: debezium-ai-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - debezium-ai-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - monitoring
+
+  # ---------------------------------------------------------------
+  # Grafana (for dashboards)
+  # ---------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: debezium-ai-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - debezium-ai-network
+    restart: unless-stopped
+    profiles:
+      - full
+      - monitoring
+
+volumes:
+  debezium-ai-data:
+  postgres-data:
+  mongodb-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  debezium-ai-network:
+    driver: bridge
