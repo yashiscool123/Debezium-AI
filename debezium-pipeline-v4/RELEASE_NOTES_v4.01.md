@@ -1,4 +1,4 @@
-# Debezium AI v4.0.1 Release Notes
+# Debezium AI v4.0.2 Release Notes
 
 **Release Date:** July 23, 2026  
 **Version:** 4.0.1-SNAPSHOT  

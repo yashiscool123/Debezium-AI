@@ -106,7 +106,7 @@ cp application.properties application-production.properties
 # Edit production properties with your settings
 
 # 3. Run
-java -jar api/target/debezium-pipeline-v4-api-4.0.1-runner.jar \
+java -jar api/target/debezium-pipeline-v4-api-4.0.2-runner.jar \
   -Dquarkus.http.port=8080 \
   -Dquarkus.profile=prod
 ```
@@ -123,7 +123,7 @@ Type=simple
 User=debezium
 Group=debezium
 WorkingDirectory=/opt/debezium-ai
-ExecStart=/usr/bin/java -Xms512m -Xmx4g -jar /opt/debezium-ai/api/target/debezium-pipeline-v4-api-4.0.1-runner.jar
+ExecStart=/usr/bin/java -Xms512m -Xmx4g -jar /opt/debezium-ai/api/target/debezium-pipeline-v4-api-4.0.2-runner.jar
 Restart=on-failure
 RestartSec=10
 EnvironmentFile=/opt/debezium-ai/application-production.properties
@@ -219,7 +219,7 @@ spec:
     spec:
       containers:
       - name: debezium-ai
-        image: debezium-ai:4.0.1
+        image: debezium-ai:4.0.2
         ports:
         - containerPort: 8080
         env:
@@ -309,7 +309,7 @@ az postgres flexible-server create \
 az container create \
   --resource-group debezium-ai-rg \
   --name debezium-ai \
-  --image debezium-ai:4.0.1 \
+  --image debezium-ai:4.0.2 \
   --ports 8080 \
   --environment-variables \
     DEBEZIUM_API_KEY=your-key \
@@ -376,7 +376,7 @@ aws ecs register-task-definition \
   --container-definitions '[
     {
       "name": "debezium-ai",
-      "image": "debezium-ai:4.0.1",
+      "image": "debezium-ai:4.0.2",
       "portMappings": [{"containerPort": 8080}],
       "environment": [
         {"name": "DEBEZIUM_API_KEY", "value": "your-key"}
@@ -438,11 +438,11 @@ gcloud sql instances create debezium-ai-db \
 
 ```bash
 # Build container
-gcloud builds submit --tag gcr.io/your-project/debezium-ai:4.0.1
+gcloud builds submit --tag gcr.io/your-project/debezium-ai:4.0.2
 
 # Deploy to Cloud Run
 gcloud run deploy debezium-ai \
-  --image gcr.io/your-project/debezium-ai:4.0.1 \
+  --image gcr.io/your-project/debezium-ai:4.0.2 \
   --platform managed \
   --region us-central1 \
   --memory 4Gi \

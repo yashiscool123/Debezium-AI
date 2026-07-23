@@ -9,7 +9,7 @@
         <relativePath>../debezium-parent/pom.xml</relativePath>
     </parent>
     <artifactId>debezium-pipeline-v4</artifactId>
-    <version>4.0.1</version>
+    <version>4.0.2</version>
     <packaging>pom</packaging>
     <name>Debezium Pipeline Generator v4</name>
     <description>Next-gen CDC pipeline generator with AI/ML-driven source-to-target mapping</description>
