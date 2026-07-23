@@ -20,7 +20,10 @@ public class UserResource {
 
     @GET
     @Operation(summary = "List all users")
-    public Response list() {
+    public Response list(@QueryParam("type") String type) {
+        if ("service".equalsIgnoreCase(type)) {
+            return Response.ok(ApiResponse.ok(authService.listServiceUsers())).build();
+        }
         return Response.ok(ApiResponse.ok(authService.listUsers())).build();
     }
 
@@ -35,7 +38,7 @@ public class UserResource {
     }
 
     @POST
-    @Operation(summary = "Create a new user")
+    @Operation(summary = "Create a new user (HUMAN or SERVICE)")
     public Response create(User user) {
         return Response.status(201).entity(ApiResponse.ok(authService.createUser(user))).build();
     }

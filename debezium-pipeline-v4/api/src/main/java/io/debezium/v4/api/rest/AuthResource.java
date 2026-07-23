@@ -1,6 +1,7 @@
 package io.debezium.v4.api.rest;
 
 import io.debezium.v4.api.auth.AuthenticationService;
+import io.debezium.v4.api.auth.UserType;
 import io.debezium.v4.api.dto.ApiResponse;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -24,7 +25,7 @@ public class AuthResource {
     public Response login(LoginRequest req) {
         var result = authService.login(req.username(), req.password());
         if (!result.success()) return Response.status(401).entity(ApiResponse.error(result.message())).build();
-        return Response.ok(ApiResponse.ok(Map.of("sessionId", result.sessionId().orElse(""), "user", result.user().orElse(null)), result.message())).build();
+        return Response.ok(ApiResponse.ok(Map.of("sessionId", result.sessionId(), "user", result.user()), result.message())).build();
     }
 
     @POST
@@ -46,6 +47,7 @@ public class AuthResource {
         return Response.ok(ApiResponse.ok(Map.of(
             "sessionId", session.get().sessionId(),
             "username", session.get().username(),
+            "userType", session.get().userType().name(),
             "roles", session.get().roles(),
             "permissions", session.get().permissions(),
             "tenantId", session.get().tenantId(),
@@ -76,13 +78,75 @@ public class AuthResource {
         var user = io.debezium.v4.api.auth.User.builder()
             .username(req.username()).email(req.email())
             .passwordHash(req.password())
+            .type(UserType.HUMAN)
             .addRole(io.debezium.v4.api.auth.Role.PIPELINE_VIEWER)
             .tenantId(req.tenantId() != null ? req.tenantId() : "default").build();
         authService.createUser(user);
         return Response.status(201).entity(ApiResponse.ok(null, "User registered")).build();
     }
 
+    // --- Service User Management ---
+
+    @POST
+    @Path("/service")
+    @Operation(summary = "Create a service user")
+    public Response createServiceUser(ServiceUserRequest req) {
+        var user = io.debezium.v4.api.auth.User.builder()
+            .id(UUID.randomUUID().toString())
+            .username(req.username())
+            .email(req.email() != null ? req.email() : req.username() + "@service.debezium.ai")
+            .passwordHash("")
+            .type(UserType.SERVICE)
+            .addRole(req.role() != null ? io.debezium.v4.api.auth.Role.fromString(req.role()) : io.debezium.v4.api.auth.Role.PIPELINE_OPERATOR)
+            .tenantId(req.tenantId() != null ? req.tenantId() : "default")
+            .enabled(true)
+            .build();
+        authService.createUser(user);
+        String apiKey = authService.generateApiKey(user.username());
+        return Response.status(201).entity(ApiResponse.ok(Map.of(
+            "user", user,
+            "apiKey", apiKey
+        ), "Service user created")).build();
+    }
+
+    @GET
+    @Path("/service")
+    @Operation(summary = "List all service users")
+    public Response listServiceUsers() {
+        return Response.ok(ApiResponse.ok(authService.listServiceUsers())).build();
+    }
+
+    @POST
+    @Path("/service/{username}/api-key")
+    @Operation(summary = "Generate a new API key for a service user")
+    public Response generateApiKey(@PathParam("username") String username) {
+        try {
+            String apiKey = authService.generateApiKey(username);
+            return Response.ok(ApiResponse.ok(Map.of("apiKey", apiKey), "API key generated")).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(400).entity(ApiResponse.error(e.getMessage())).build();
+        }
+    }
+
+    @POST
+    @Path("/service/{username}/revoke")
+    @Operation(summary = "Revoke all API keys for a service user")
+    public Response revokeApiKeys(@PathParam("username") String username) {
+        var keys = authService.listApiKeys(username);
+        for (String key : keys) authService.revokeApiKey(key);
+        return Response.ok(ApiResponse.ok(null, "API keys revoked for: " + username)).build();
+    }
+
+    @GET
+    @Path("/service/{username}/api-keys")
+    @Operation(summary = "List API keys for a service user")
+    public Response listApiKeys(@PathParam("username") String username) {
+        var keys = authService.listApiKeys(username);
+        return Response.ok(ApiResponse.ok(Map.of("username", username, "apiKeys", keys))).build();
+    }
+
     public record LoginRequest(String username, String password) {}
     public record SSORequest(String authCode, String redirectUri) {}
     public record UserRegistration(String username, String email, String password, String tenantId) {}
+    public record ServiceUserRequest(String username, String email, String role, String tenantId) {}
 }

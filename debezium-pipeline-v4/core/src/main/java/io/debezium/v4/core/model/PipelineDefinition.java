@@ -11,6 +11,8 @@ public record PipelineDefinition(
     String description,
     String version,
     String tenantId,
+    String serviceUserId,
+    boolean runAsServiceUser,
     SourceSpec source,
     TargetSpec target,
     List<TableMappingSpec> tableMappings,
@@ -29,6 +31,8 @@ public record PipelineDefinition(
         private String description;
         private String version = "1.0.0";
         private String tenantId = "default";
+        private String serviceUserId;
+        private boolean runAsServiceUser = false;
         private SourceSpec source;
         private TargetSpec target;
         private List<TableMappingSpec> tableMappings = List.of();
@@ -44,6 +48,8 @@ public record PipelineDefinition(
         public Builder description(String description) { this.description = description; return this; }
         public Builder version(String version) { this.version = version; return this; }
         public Builder tenantId(String tenantId) { this.tenantId = tenantId; return this; }
+        public Builder serviceUserId(String serviceUserId) { this.serviceUserId = serviceUserId; return this; }
+        public Builder runAsServiceUser(boolean runAsServiceUser) { this.runAsServiceUser = runAsServiceUser; return this; }
         public Builder source(SourceSpec source) { this.source = source; return this; }
         public Builder target(TargetSpec target) { this.target = target; return this; }
         public Builder tableMappings(List<TableMappingSpec> tableMappings) { this.tableMappings = tableMappings; return this; }
@@ -58,8 +64,9 @@ public record PipelineDefinition(
             if (pipelineMetadata == null) {
                 pipelineMetadata = PipelineMetadata.builder().build();
             }
-            return new PipelineDefinition(id, name, description, version, tenantId, source, target,
-                tableMappings, transformations, deployment, monitoring, tags, metadata, pipelineMetadata);
+            return new PipelineDefinition(id, name, description, version, tenantId, serviceUserId,
+                runAsServiceUser, source, target, tableMappings, transformations, deployment,
+                monitoring, tags, metadata, pipelineMetadata);
         }
     }
 

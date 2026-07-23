@@ -18,9 +18,10 @@ public class PipelineEngine {
             .build();
         PipelineDefinition created = new PipelineDefinition(
             id, definition.name(), definition.description(), definition.version(),
-            definition.tenantId(), definition.source(), definition.target(),
-            definition.tableMappings(), definition.transformations(), definition.deployment(),
-            definition.monitoring(), definition.tags(), definition.metadata(), meta);
+            definition.tenantId(), definition.serviceUserId(), definition.runAsServiceUser(),
+            definition.source(), definition.target(), definition.tableMappings(),
+            definition.transformations(), definition.deployment(), definition.monitoring(),
+            definition.tags(), definition.metadata(), meta);
         pipelines.put(id, created);
         return created;
     }
@@ -33,15 +34,22 @@ public class PipelineEngine {
             .collect(Collectors.toList());
     }
 
+    public List<PipelineDefinition> listByServiceUser(String serviceUserId) {
+        return pipelines.values().stream()
+            .filter(p -> p.serviceUserId() != null && p.serviceUserId().equals(serviceUserId))
+            .collect(Collectors.toList());
+    }
+
     public List<PipelineDefinition> listAll() { return List.copyOf(pipelines.values()); }
 
     public Optional<PipelineDefinition> update(String id, PipelineDefinition updated) {
         return get(id).map(existing -> {
             PipelineDefinition merged = new PipelineDefinition(
                 id, updated.name(), updated.description(), updated.version(),
-                existing.tenantId(), updated.source(), updated.target(),
-                updated.tableMappings(), updated.transformations(), updated.deployment(),
-                updated.monitoring(), updated.tags(), updated.metadata(),
+                existing.tenantId(), updated.serviceUserId(), updated.runAsServiceUser(),
+                updated.source(), updated.target(), updated.tableMappings(),
+                updated.transformations(), updated.deployment(), updated.monitoring(),
+                updated.tags(), updated.metadata(),
                 new PipelineMetadata(existing.pipelineMetadata().status(), existing.pipelineMetadata().createdAt(),
                     Instant.now(), existing.pipelineMetadata().deployedAt(), existing.pipelineMetadata().createdBy(),
                     existing.pipelineMetadata().versionNumber() + 1, id, updated.pipelineMetadata().checksum()));
@@ -57,9 +65,14 @@ public class PipelineEngine {
     }
 
     public PipelineInstance deploy(String id) {
+        return deploy(id, null);
+    }
+
+    public PipelineInstance deploy(String id, String runAsUserId) {
         PipelineDefinition def = pipelines.get(id);
         if (def == null) throw new IllegalArgumentException("Pipeline not found: " + id);
-        PipelineInstance instance = new PipelineInstance(id, def, PipelineInstance.Status.DEPLOYING, Instant.now(), null, Map.of());
+        PipelineInstance instance = new PipelineInstance(id, def, PipelineInstance.Status.DEPLOYING,
+            Instant.now(), null, runAsUserId, Map.of());
         instances.put(id, instance);
         return instance;
     }
@@ -69,7 +82,8 @@ public class PipelineEngine {
     public void updateInstanceStatus(String id, PipelineInstance.Status status) {
         getInstance(id).ifPresent(inst -> {
             PipelineInstance updated = new PipelineInstance(inst.id(), inst.definition(), status, inst.startedAt(),
-                status == PipelineInstance.Status.RUNNING ? Instant.now() : inst.deployedAt(), inst.metrics());
+                status == PipelineInstance.Status.RUNNING ? Instant.now() : inst.deployedAt(),
+                inst.runAsUserId(), inst.metrics());
             instances.put(id, updated);
         });
     }
@@ -82,13 +96,15 @@ public class PipelineEngine {
                 .versionNumber(1)
                 .build();
             return new PipelineDefinition(UUID.randomUUID().toString(), existing.name() + " (copy)",
-                existing.description(), "1.0.0", existing.tenantId(), existing.source(),
-                existing.target(), existing.tableMappings(), existing.transformations(),
-                existing.deployment(), existing.monitoring(), existing.tags(), existing.metadata(), meta);
+                existing.description(), "1.0.0", existing.tenantId(), existing.serviceUserId(),
+                existing.runAsServiceUser(), existing.source(), existing.target(),
+                existing.tableMappings(), existing.transformations(), existing.deployment(),
+                existing.monitoring(), existing.tags(), existing.metadata(), meta);
         }).orElseThrow(() -> new IllegalArgumentException("Pipeline not found: " + id));
     }
 
-    public record PipelineInstance(String id, PipelineDefinition definition, Status status, Instant startedAt, Instant deployedAt, Map<String,Object> metrics) {
+    public record PipelineInstance(String id, PipelineDefinition definition, Status status,
+        Instant startedAt, Instant deployedAt, String runAsUserId, Map<String,Object> metrics) {
         public enum Status { PENDING, DEPLOYING, RUNNING, DEGRADED, FAILED, STOPPED }
     }
 }

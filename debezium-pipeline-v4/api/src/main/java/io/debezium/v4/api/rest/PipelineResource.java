@@ -6,6 +6,7 @@ import io.debezium.v4.core.validator.PipelineValidator;
 import io.debezium.v4.ai.mapping.MappingEngine;
 import io.debezium.v4.monitoring.MetricsCollector;
 import io.debezium.v4.plugins.registry.PluginRegistry;
+import io.debezium.v4.api.auth.AuthenticationService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -26,11 +27,12 @@ public class PipelineResource {
     @Inject MappingEngine mappingEngine;
     @Inject MetricsCollector metrics;
     @Inject PluginRegistry pluginRegistry;
+    @Inject AuthenticationService authService;
 
     @POST
     @Operation(summary = "Create a new pipeline")
     @APIResponse(responseCode = "201", description = "Pipeline created")
-    public Response create(PipelineDefinition pipeline) {
+    public Response create(PipelineDefinition pipeline, @HeaderParam("Authorization") String auth) {
         PipelineDefinition created = engine.create(pipeline);
         metrics.record("pipeline.created", 1);
         return Response.status(201).entity(created).build();
@@ -38,8 +40,15 @@ public class PipelineResource {
 
     @GET
     @Operation(summary = "List all pipelines")
-    public Response list(@QueryParam("tenant") String tenant) {
-        List<PipelineDefinition> list = tenant != null ? engine.list(tenant) : engine.listAll();
+    public Response list(@QueryParam("tenant") String tenant, @QueryParam("serviceUser") String serviceUser) {
+        List<PipelineDefinition> list;
+        if (serviceUser != null) {
+            list = engine.listByServiceUser(serviceUser);
+        } else if (tenant != null) {
+            list = engine.list(tenant);
+        } else {
+            list = engine.listAll();
+        }
         return Response.ok(list).build();
     }
 
@@ -78,9 +87,23 @@ public class PipelineResource {
     @POST
     @Path("/{id}/deploy")
     @Operation(summary = "Deploy pipeline")
-    public Response deploy(@PathParam("id") String id) {
+    public Response deploy(@PathParam("id") String id, @HeaderParam("Authorization") String auth) {
         try {
-            PipelineEngine.PipelineInstance instance = engine.deploy(id);
+            String runAsUserId = resolveRunAsUser(auth);
+            PipelineEngine.PipelineInstance instance = engine.deploy(id, runAsUserId);
+            metrics.record("pipeline.deployed", 1);
+            return Response.ok(instance).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(404).entity(Map.of("error", e.getMessage())).build();
+        }
+    }
+
+    @POST
+    @Path("/{id}/run-as/{serviceUserId}")
+    @Operation(summary = "Deploy pipeline as a specific service user")
+    public Response deployAsServiceUser(@PathParam("id") String id, @PathParam("serviceUserId") String serviceUserId) {
+        try {
+            PipelineEngine.PipelineInstance instance = engine.deploy(id, serviceUserId);
             metrics.record("pipeline.deployed", 1);
             return Response.ok(instance).build();
         } catch (IllegalArgumentException e) {
@@ -117,5 +140,15 @@ public class PipelineResource {
         } catch (IllegalArgumentException e) {
             return Response.status(404).entity(Map.of("error", e.getMessage())).build();
         }
+    }
+
+    private String resolveRunAsUser(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) return null;
+        String token = authHeader.substring(7);
+        var session = authService.validateSession(token);
+        if (session.isPresent()) return session.get().userId();
+        var apiKeyResult = authService.authenticateWithApiKey(token);
+        if (apiKeyResult.success() && apiKeyResult.user() != null) return apiKeyResult.user().id();
+        return null;
     }
 }

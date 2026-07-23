@@ -30,18 +30,19 @@ public enum Role {
             case ADMIN -> Set.of(
                 Permission.PIPELINE_CREATE, Permission.PIPELINE_READ, Permission.PIPELINE_UPDATE,
                 Permission.PIPELINE_DELETE, Permission.PIPELINE_DEPLOY, Permission.PIPELINE_START,
-                Permission.PIPELINE_STOP, Permission.CONNECTOR_READ, Permission.CONNECTOR_CREATE,
-                Permission.CONNECTOR_UPDATE, Permission.CONNECTOR_DELETE, Permission.MAPPING_READ,
-                Permission.MAPPING_CREATE, Permission.MAPPING_UPDATE, Permission.MAPPING_DELETE,
-                Permission.METRICS_READ, Permission.METRICS_WRITE, Permission.AUDIT_READ,
-                Permission.USER_READ, Permission.USER_CREATE, Permission.USER_UPDATE,
-                Permission.EXPORT, Permission.IMPORT
+                Permission.PIPELINE_STOP, Permission.PIPELINE_RUN_AS, Permission.CONNECTOR_READ,
+                Permission.CONNECTOR_CREATE, Permission.CONNECTOR_UPDATE, Permission.CONNECTOR_DELETE,
+                Permission.MAPPING_READ, Permission.MAPPING_CREATE, Permission.MAPPING_UPDATE,
+                Permission.MAPPING_DELETE, Permission.METRICS_READ, Permission.METRICS_WRITE,
+                Permission.AUDIT_READ, Permission.USER_READ, Permission.USER_CREATE,
+                Permission.USER_UPDATE, Permission.EXPORT, Permission.IMPORT
             );
             case PIPELINE_MANAGER -> Set.of(
                 Permission.PIPELINE_CREATE, Permission.PIPELINE_READ, Permission.PIPELINE_UPDATE,
                 Permission.PIPELINE_DELETE, Permission.PIPELINE_DEPLOY, Permission.PIPELINE_START,
-                Permission.PIPELINE_STOP, Permission.CONNECTOR_READ, Permission.MAPPING_READ,
-                Permission.MAPPING_CREATE, Permission.METRICS_READ, Permission.EXPORT, Permission.IMPORT
+                Permission.PIPELINE_STOP, Permission.PIPELINE_RUN_AS, Permission.CONNECTOR_READ,
+                Permission.MAPPING_READ, Permission.MAPPING_CREATE, Permission.METRICS_READ,
+                Permission.EXPORT, Permission.IMPORT
             );
             case PIPELINE_OPERATOR -> Set.of(
                 Permission.PIPELINE_READ, Permission.PIPELINE_DEPLOY, Permission.PIPELINE_START,

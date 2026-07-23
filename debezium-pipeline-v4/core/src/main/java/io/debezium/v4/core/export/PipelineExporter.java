@@ -119,8 +119,10 @@ public class PipelineExporter {
             );
             return new PipelineDefinition(
                 p.id(), p.name(), p.description(), p.version(), p.tenantId(),
+                p.serviceUserId(), p.runAsServiceUser(),
                 p.source(), p.target(), p.tableMappings(), p.transformations(),
-                updatedDeployment, p.monitoring(), p.tags(), p.metadata()
+                updatedDeployment, p.monitoring(), p.tags(), p.metadata(),
+                p.pipelineMetadata()
             );
         }
         return p;

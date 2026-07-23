@@ -16,7 +16,8 @@ import java.util.Set;
 public class RBACFilter implements ContainerRequestFilter {
 
     private static final Set<String> PUBLIC_PATHS = Set.of("/v4/auth/login", "/v4/auth/sso", "/v4/auth/register",
-        "/v4/health", "/q/health", "/q/metrics", "/v4/openapi", "/v4/auth/logout");
+        "/v4/health", "/q/health", "/q/metrics", "/v4/openapi", "/v4/auth/logout",
+        "/v4/auth/service/api-key");
 
     private static final Map<String, Permission> PATH_PERMISSIONS = Map.ofEntries(
         Map.entry("POST:/v4/pipelines", Permission.PIPELINE_CREATE),
@@ -26,6 +27,7 @@ public class RBACFilter implements ContainerRequestFilter {
         Map.entry("POST:/v4/pipelines/.*/deploy", Permission.PIPELINE_DEPLOY),
         Map.entry("POST:/v4/pipelines/.*/start", Permission.PIPELINE_START),
         Map.entry("POST:/v4/pipelines/.*/stop", Permission.PIPELINE_STOP),
+        Map.entry("POST:/v4/pipelines/.*/run-as", Permission.PIPELINE_RUN_AS),
         Map.entry("POST:/v4/validate", Permission.PIPELINE_READ),
         Map.entry("POST:/v4/pipelines/.*/duplicate", Permission.PIPELINE_CREATE),
         Map.entry("POST:/v4/mappings", Permission.MAPPING_CREATE),
@@ -47,7 +49,10 @@ public class RBACFilter implements ContainerRequestFilter {
         Map.entry("GET:/v4/export", Permission.EXPORT),
         Map.entry("POST:/v4/import", Permission.IMPORT),
         Map.entry("GET:/v4/settings", Permission.SETTINGS_READ),
-        Map.entry("PUT:/v4/settings", Permission.SETTINGS_WRITE)
+        Map.entry("PUT:/v4/settings", Permission.SETTINGS_WRITE),
+        Map.entry("POST:/v4/auth/service", Permission.USER_CREATE),
+        Map.entry("GET:/v4/auth/service/", Permission.USER_READ),
+        Map.entry("POST:/v4/auth/service/.*/api-key", Permission.USER_READ)
     );
 
     @Inject
@@ -66,9 +71,19 @@ public class RBACFilter implements ContainerRequestFilter {
             return;
         }
 
-        String sessionId = authHeader.substring(7);
+        String token = authHeader.substring(7);
 
-        var session = authService.validateSession(sessionId);
+        // Support service user API key authentication
+        var session = authService.validateSession(token);
+        if (session.isEmpty()) {
+            var apiKeyResult = authService.authenticateWithApiKey(token);
+            if (!apiKeyResult.success()) {
+                request.abortWith(Response.status(401).entity(Map.of("error", "Session expired or invalid API key")).build());
+                return;
+            }
+            session = authService.validateSession(apiKeyResult.sessionId());
+        }
+
         if (session.isEmpty()) {
             request.abortWith(Response.status(401).entity(Map.of("error", "Session expired or invalid")).build());
             return;
