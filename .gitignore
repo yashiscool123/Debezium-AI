@@ -1,0 +1,43 @@
+# Build artifacts
+target/
+build/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# Maven
+!/.mvn/wrapper/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Environment
+.env
+.env.local
+*.secret
+
+# Testing
+test-output/
+*-test.db

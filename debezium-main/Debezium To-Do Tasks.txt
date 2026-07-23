@@ -1,0 +1,18 @@
+Also, do the following:
+1) Ensure that you have an in-depth Developer documentations generated. 
+2) generate a separate end user documentation for usage.
+3) Add security features like User/Password login & SSO authentication options.
+4) build a one click setup and configuration wizard.
+5) make the product compatible to be able to export pipelines & other important artifacts as releases between environments like Dev, QA & Production.
+6) Create a ReamME.md file listing what the product does and its features in depth.
+7) Build an installer for easy setup and use across on premise environments & on cloud like Azure / AWS / GCP.
+8) Ensure to maintain a distributed architecture for optimal performance and faster multi-threaded / parallel executions approach.
+9) Also, include role based approach for the UI so that only authorised users can access / modify the relevant pipelines / configurations etc.
+10) Use NoSQL to store all the configurations and job runs and job history.
+11) Ensure that all data is auditable and pipelines can be debugged if any issues.
+12) Create multi-threaded / parallel executions pipelines connectors for connecting and ingesting data from MS Dynamics 365, Snowflake, AWS S3, Databricks and other popular databases / applications.
+13) Convert all existing connectors to be multi-threaded / parallel executions enabled.
+14) Create a release v4.01 of the compiled code along with a release note.
+15) Build a separate deployment guide.
+
+3) Convert the UI code into .net / node.js or both with security features like User/Password & SSO authentication options.
