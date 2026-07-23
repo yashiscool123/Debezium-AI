@@ -131,6 +131,14 @@ public class PipelineResource {
     }
 
     @POST
+    @Path("/encrypt-all")
+    @Operation(summary = "Re-encrypt all pipeline secrets at rest")
+    public Response reEncryptAll() {
+        int count = engine.reEncryptAll();
+        return Response.ok(Map.of("reEncrypted", count)).build();
+    }
+
+    @POST
     @Path("/{id}/duplicate")
     @Operation(summary = "Duplicate pipeline")
     public Response duplicate(@PathParam("id") String id) {

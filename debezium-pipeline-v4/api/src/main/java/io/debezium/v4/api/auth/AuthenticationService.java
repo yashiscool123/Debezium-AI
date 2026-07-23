@@ -1,9 +1,12 @@
 package io.debezium.v4.api.auth;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.spec.KeySpec;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,7 +25,7 @@ public class AuthenticationService {
             .id(UUID.randomUUID().toString())
             .username("admin")
             .email("admin@debezium.ai")
-            .passwordHash(hashPassword("admin", "debezium"))
+            .passwordHash(hashPassword("admin"))
             .type(UserType.HUMAN)
             .addRole(Role.SUPER_ADMIN)
             .tenantId("default")
@@ -44,8 +47,7 @@ public class AuthenticationService {
         if (!user.enabled()) return new AuthResult(false, "Account disabled", null, null);
         if (user.type() == UserType.SERVICE) return new AuthResult(false, "Service users must use API key authentication", null, null);
 
-        String hash = hashPassword(password, "debezium");
-        if (!user.passwordHash().equals(hash)) return new AuthResult(false, "Invalid credentials", null, null);
+        if (!verifyPassword(password, user.passwordHash())) return new AuthResult(false, "Invalid credentials", null, null);
 
         String sessionId = UUID.randomUUID().toString();
         var session = new UserSession(sessionId, user.id(), user.username(), user.type(),
@@ -183,13 +185,28 @@ public class AuthenticationService {
         return new SSOAuthResult(true, "SSO login successful", sessionId, user, request.provider());
     }
 
-    private String hashPassword(String password, String salt) {
+    public String hashPassword(String password) {
         try {
-            var md = MessageDigest.getInstance("SHA-256");
-            md.update(salt.getBytes());
-            byte[] hash = md.digest(password.getBytes());
-            return Base64.getEncoder().encodeToString(hash);
-        } catch (NoSuchAlgorithmException e) { throw new RuntimeException(e); }
+            byte[] salt = new byte[16];
+            random.nextBytes(salt);
+            var spec = new PBEKeySpec(password.toCharArray(), salt, 310000, 256);
+            var factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            byte[] hash = factory.generateSecret(spec).getEncoded();
+            return Base64.getEncoder().encodeToString(salt) + ":" + Base64.getEncoder().encodeToString(hash);
+        } catch (Exception e) { throw new RuntimeException("Password hashing failed", e); }
+    }
+
+    private boolean verifyPassword(String password, String storedHash) {
+        try {
+            String[] parts = storedHash.split(":");
+            if (parts.length != 2) return false;
+            byte[] salt = Base64.getDecoder().decode(parts[0]);
+            byte[] expectedHash = Base64.getDecoder().decode(parts[1]);
+            var spec = new PBEKeySpec(password.toCharArray(), salt, 310000, 256);
+            var factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            byte[] actualHash = factory.generateSecret(spec).getEncoded();
+            return MessageDigest.isEqual(actualHash, expectedHash);
+        } catch (Exception e) { return false; }
     }
 
     public interface SSOProvider {

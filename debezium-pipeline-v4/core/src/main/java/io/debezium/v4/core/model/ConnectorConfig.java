@@ -1,6 +1,9 @@
 package io.debezium.v4.core.model;
 
-import java.util.List;
+import io.debezium.v4.core.security.SecretManager;
+import io.debezium.v4.core.util.CryptoUtil;
+
+import java.util.HashMap;
 import java.util.Map;
 
 public record ConnectorConfig(
@@ -11,6 +14,62 @@ public record ConnectorConfig(
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    public ConnectorConfig withEncryptedSecrets(SecretManager secretManager) {
+        if (secrets == null || secrets.isEmpty()) return this;
+        Map<String, String> encrypted = new HashMap<>();
+        for (var entry : secrets.entrySet()) {
+            String value = entry.getValue();
+            if (value != null && !CryptoUtil.isEncrypted(value)) {
+                encrypted.put(entry.getKey(), secretManager.encrypt(value));
+            } else {
+                encrypted.put(entry.getKey(), value);
+            }
+        }
+        return new ConnectorConfig(connectorClass, name, config, Map.copyOf(encrypted));
+    }
+
+    public ConnectorConfig withDecryptedSecrets(SecretManager secretManager) {
+        if (secrets == null || secrets.isEmpty()) return this;
+        Map<String, String> decrypted = new HashMap<>();
+        for (var entry : secrets.entrySet()) {
+            String value = entry.getValue();
+            if (value != null && CryptoUtil.isEncrypted(value)) {
+                decrypted.put(entry.getKey(), secretManager.decrypt(value));
+            } else {
+                decrypted.put(entry.getKey(), value);
+            }
+        }
+        return new ConnectorConfig(connectorClass, name, config, Map.copyOf(decrypted));
+    }
+
+    public ConnectorConfig withMaskedSecrets(SecretManager secretManager) {
+        if (secrets == null || secrets.isEmpty()) return this;
+        Map<String, String> masked = new HashMap<>();
+        for (var entry : secrets.entrySet()) {
+            if (secretManager.isSensitiveKey(entry.getKey())) {
+                masked.put(entry.getKey(), secretManager.mask(entry.getValue()));
+            } else {
+                masked.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return new ConnectorConfig(connectorClass, name, config, Map.copyOf(masked));
+    }
+
+    public ConnectorConfig withEncryptedConfig(SecretManager secretManager) {
+        Map<String, String> encryptedConfig = secretManager.encryptConfig(config);
+        return new ConnectorConfig(connectorClass, name, encryptedConfig, secrets);
+    }
+
+    public ConnectorConfig withDecryptedConfig(SecretManager secretManager) {
+        Map<String, String> decryptedConfig = secretManager.decryptConfig(config);
+        return new ConnectorConfig(connectorClass, name, decryptedConfig, secrets);
+    }
+
+    public ConnectorConfig withMaskedConfig(SecretManager secretManager) {
+        Map<String, String> maskedConfig = secretManager.maskConfig(config);
+        return new ConnectorConfig(connectorClass, name, maskedConfig, secrets);
     }
 
     public static class Builder {

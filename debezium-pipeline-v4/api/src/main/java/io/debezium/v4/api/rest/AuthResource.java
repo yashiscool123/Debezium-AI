@@ -1,7 +1,9 @@
 package io.debezium.v4.api.rest;
 
 import io.debezium.v4.api.auth.AuthenticationService;
+import io.debezium.v4.api.auth.User;
 import io.debezium.v4.api.auth.UserType;
+import io.debezium.v4.api.auth.Role;
 import io.debezium.v4.api.dto.ApiResponse;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -75,11 +77,11 @@ public class AuthResource {
     @Path("/register")
     @Operation(summary = "Register a new user")
     public Response register(UserRegistration req) {
-        var user = io.debezium.v4.api.auth.User.builder()
+        var user = User.builder()
             .username(req.username()).email(req.email())
-            .passwordHash(req.password())
+            .passwordHash(authService.hashPassword(req.password()))
             .type(UserType.HUMAN)
-            .addRole(io.debezium.v4.api.auth.Role.PIPELINE_VIEWER)
+            .addRole(Role.PIPELINE_VIEWER)
             .tenantId(req.tenantId() != null ? req.tenantId() : "default").build();
         authService.createUser(user);
         return Response.status(201).entity(ApiResponse.ok(null, "User registered")).build();

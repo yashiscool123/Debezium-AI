@@ -1,7 +1,9 @@
 package io.debezium.v4.core.export;
 
+import io.debezium.v4.core.model.ConnectorConfig;
 import io.debezium.v4.core.model.PipelineDefinition;
 import io.debezium.v4.core.engine.PipelineEngine;
+import io.debezium.v4.core.security.SecretManager;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Instant;
@@ -11,6 +13,7 @@ import java.util.*;
 public class PipelineExporter {
 
     @Inject PipelineEngine engine;
+    @Inject SecretManager secretManager;
 
     public record ExportPackage(
         String id,
@@ -61,9 +64,13 @@ public class PipelineExporter {
     public ExportPackage exportPipelines(List<String> pipelineIds, String sourceEnv, String targetEnv) {
         List<ExportedPipeline> pipelines = new ArrayList<>();
         for (String id : pipelineIds) {
-            engine.get(id).ifPresent(p -> pipelines.add(new ExportedPipeline(
-                p.id(), p.name(), p.version(), p, Map.of("format", "strimzi"), "EXPORTED"
-            )));
+            engine.get(id).ifPresent(p -> {
+                PipelineDefinition sanitized = maskPipelineSecrets(p);
+                pipelines.add(new ExportedPipeline(
+                    sanitized.id(), sanitized.name(), sanitized.version(),
+                    sanitized, Map.of("format", "strimzi"), "EXPORTED"
+                ));
+            });
         }
         return new ExportPackage(
             UUID.randomUUID().toString(),
@@ -106,6 +113,42 @@ public class PipelineExporter {
         } catch (Exception e) {
             throw new RuntimeException("Import failed: " + e.getMessage(), e);
         }
+    }
+
+    private PipelineDefinition maskPipelineSecrets(PipelineDefinition p) {
+        SourceSpec maskedSource = null;
+        if (p.source() != null) {
+            ConnectorConfig maskedSrcConnector = null;
+            if (p.source().connector() != null) {
+                maskedSrcConnector = p.source().connector()
+                    .withMaskedSecrets(secretManager)
+                    .withMaskedConfig(secretManager);
+            }
+            maskedSource = new SourceSpec(
+                p.source().type(), maskedSrcConnector, p.source().schema(),
+                p.source().snapshot(), p.source().properties()
+            );
+        }
+        TargetSpec maskedTarget = null;
+        if (p.target() != null) {
+            ConnectorConfig maskedTgtConnector = null;
+            if (p.target().connector() != null) {
+                maskedTgtConnector = p.target().connector()
+                    .withMaskedSecrets(secretManager)
+                    .withMaskedConfig(secretManager);
+            }
+            maskedTarget = new TargetSpec(
+                p.target().type(), maskedTgtConnector, p.target().topics(),
+                p.target().sink(), p.target().properties()
+            );
+        }
+        return new PipelineDefinition(
+            p.id(), p.name(), p.description(), p.version(), p.tenantId(),
+            p.serviceUserId(), p.runAsServiceUser(),
+            maskedSource, maskedTarget, p.tableMappings(), p.transformations(),
+            p.deployment(), p.monitoring(), p.tags(), p.metadata(),
+            p.pipelineMetadata()
+        );
     }
 
     private PipelineDefinition applyEnvironmentOverrides(PipelineDefinition p, String env) {
