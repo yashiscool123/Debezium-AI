@@ -17,6 +17,7 @@ public record PipelineDefinition(
     TargetSpec target,
     List<TableMappingSpec> tableMappings,
     List<TransformationSpec> transformations,
+    DataQualityConfig dataQuality,
     DeploymentSpec deployment,
     MonitoringSpec monitoring,
     Map<String, String> tags,
@@ -37,6 +38,7 @@ public record PipelineDefinition(
         private TargetSpec target;
         private List<TableMappingSpec> tableMappings = List.of();
         private List<TransformationSpec> transformations = List.of();
+        private DataQualityConfig dataQuality;
         private DeploymentSpec deployment;
         private MonitoringSpec monitoring;
         private Map<String, String> tags = Map.of();
@@ -54,6 +56,7 @@ public record PipelineDefinition(
         public Builder target(TargetSpec target) { this.target = target; return this; }
         public Builder tableMappings(List<TableMappingSpec> tableMappings) { this.tableMappings = tableMappings; return this; }
         public Builder transformations(List<TransformationSpec> transformations) { this.transformations = transformations; return this; }
+        public Builder dataQuality(DataQualityConfig dataQuality) { this.dataQuality = dataQuality; return this; }
         public Builder deployment(DeploymentSpec deployment) { this.deployment = deployment; return this; }
         public Builder monitoring(MonitoringSpec monitoring) { this.monitoring = monitoring; return this; }
         public Builder tags(Map<String, String> tags) { this.tags = tags; return this; }
@@ -64,8 +67,11 @@ public record PipelineDefinition(
             if (pipelineMetadata == null) {
                 pipelineMetadata = PipelineMetadata.builder().build();
             }
+            if (dataQuality == null) {
+                dataQuality = DataQualityConfig.disabled();
+            }
             return new PipelineDefinition(id, name, description, version, tenantId, serviceUserId,
-                runAsServiceUser, source, target, tableMappings, transformations, deployment,
+                runAsServiceUser, source, target, tableMappings, transformations, dataQuality, deployment,
                 monitoring, tags, metadata, pipelineMetadata);
         }
     }

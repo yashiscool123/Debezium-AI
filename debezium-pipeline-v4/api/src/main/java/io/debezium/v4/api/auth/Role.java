@@ -35,18 +35,20 @@ public enum Role {
                 Permission.MAPPING_READ, Permission.MAPPING_CREATE, Permission.MAPPING_UPDATE,
                 Permission.MAPPING_DELETE, Permission.METRICS_READ, Permission.METRICS_WRITE,
                 Permission.AUDIT_READ, Permission.USER_READ, Permission.USER_CREATE,
-                Permission.USER_UPDATE, Permission.EXPORT, Permission.IMPORT
+                Permission.USER_UPDATE, Permission.EXPORT, Permission.IMPORT,
+                Permission.DATA_QUALITY_READ, Permission.DATA_QUALITY_WRITE
             );
             case PIPELINE_MANAGER -> Set.of(
                 Permission.PIPELINE_CREATE, Permission.PIPELINE_READ, Permission.PIPELINE_UPDATE,
                 Permission.PIPELINE_DELETE, Permission.PIPELINE_DEPLOY, Permission.PIPELINE_START,
                 Permission.PIPELINE_STOP, Permission.PIPELINE_RUN_AS, Permission.CONNECTOR_READ,
                 Permission.MAPPING_READ, Permission.MAPPING_CREATE, Permission.METRICS_READ,
-                Permission.EXPORT, Permission.IMPORT
+                Permission.EXPORT, Permission.IMPORT,
+                Permission.DATA_QUALITY_READ, Permission.DATA_QUALITY_WRITE
             );
             case PIPELINE_OPERATOR -> Set.of(
                 Permission.PIPELINE_READ, Permission.PIPELINE_DEPLOY, Permission.PIPELINE_START,
-                Permission.PIPELINE_STOP, Permission.METRICS_READ
+                Permission.PIPELINE_STOP, Permission.METRICS_READ, Permission.DATA_QUALITY_READ
             );
             case PIPELINE_VIEWER -> Set.of(
                 Permission.PIPELINE_READ, Permission.METRICS_READ

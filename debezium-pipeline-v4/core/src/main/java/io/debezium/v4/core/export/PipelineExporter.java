@@ -146,7 +146,7 @@ public class PipelineExporter {
             p.id(), p.name(), p.description(), p.version(), p.tenantId(),
             p.serviceUserId(), p.runAsServiceUser(),
             maskedSource, maskedTarget, p.tableMappings(), p.transformations(),
-            p.deployment(), p.monitoring(), p.tags(), p.metadata(),
+            p.dataQuality(), p.deployment(), p.monitoring(), p.tags(), p.metadata(),
             p.pipelineMetadata()
         );
     }
@@ -164,7 +164,7 @@ public class PipelineExporter {
                 p.id(), p.name(), p.description(), p.version(), p.tenantId(),
                 p.serviceUserId(), p.runAsServiceUser(),
                 p.source(), p.target(), p.tableMappings(), p.transformations(),
-                updatedDeployment, p.monitoring(), p.tags(), p.metadata(),
+                p.dataQuality(), updatedDeployment, p.monitoring(), p.tags(), p.metadata(),
                 p.pipelineMetadata()
             );
         }

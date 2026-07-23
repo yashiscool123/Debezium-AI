@@ -28,8 +28,8 @@ public class PipelineEngine {
             id, encrypted.name(), encrypted.description(), encrypted.version(),
             encrypted.tenantId(), encrypted.serviceUserId(), encrypted.runAsServiceUser(),
             encrypted.source(), encrypted.target(), encrypted.tableMappings(),
-            encrypted.transformations(), encrypted.deployment(), encrypted.monitoring(),
-            encrypted.tags(), encrypted.metadata(), meta);
+            encrypted.transformations(), encrypted.dataQuality(), encrypted.deployment(),
+            encrypted.monitoring(), encrypted.tags(), encrypted.metadata(), meta);
         pipelines.put(id, created);
         return created;
     }
@@ -57,8 +57,8 @@ public class PipelineEngine {
                 id, encrypted.name(), encrypted.description(), encrypted.version(),
                 existing.tenantId(), encrypted.serviceUserId(), encrypted.runAsServiceUser(),
                 encrypted.source(), encrypted.target(), encrypted.tableMappings(),
-                encrypted.transformations(), encrypted.deployment(), encrypted.monitoring(),
-                encrypted.tags(), encrypted.metadata(),
+                encrypted.transformations(), encrypted.dataQuality(), encrypted.deployment(),
+                encrypted.monitoring(), encrypted.tags(), encrypted.metadata(),
                 new PipelineMetadata(existing.pipelineMetadata().status(), existing.pipelineMetadata().createdAt(),
                     Instant.now(), existing.pipelineMetadata().deployedAt(), existing.pipelineMetadata().createdBy(),
                     existing.pipelineMetadata().versionNumber() + 1, id, encrypted.pipelineMetadata().checksum()));
@@ -108,8 +108,8 @@ public class PipelineEngine {
             return new PipelineDefinition(UUID.randomUUID().toString(), existing.name() + " (copy)",
                 existing.description(), "1.0.0", existing.tenantId(), existing.serviceUserId(),
                 existing.runAsServiceUser(), existing.source(), existing.target(),
-                existing.tableMappings(), existing.transformations(), existing.deployment(),
-                existing.monitoring(), existing.tags(), existing.metadata(), meta);
+                existing.tableMappings(), existing.transformations(), existing.dataQuality(),
+                existing.deployment(), existing.monitoring(), existing.tags(), existing.metadata(), meta);
         }).orElseThrow(() -> new IllegalArgumentException("Pipeline not found: " + id));
     }
 
@@ -131,8 +131,8 @@ public class PipelineEngine {
             def.id(), def.name(), def.description(), def.version(), def.tenantId(),
             def.serviceUserId(), def.runAsServiceUser(),
             encryptedSource, encryptedTarget, def.tableMappings(),
-            def.transformations(), def.deployment(), def.monitoring(),
-            def.tags(), def.metadata(), def.pipelineMetadata()
+            def.transformations(), def.dataQuality(), def.deployment(),
+            def.monitoring(), def.tags(), def.metadata(), def.pipelineMetadata()
         );
     }
 
@@ -143,8 +143,8 @@ public class PipelineEngine {
             def.id(), def.name(), def.description(), def.version(), def.tenantId(),
             def.serviceUserId(), def.runAsServiceUser(),
             decryptedSource, decryptedTarget, def.tableMappings(),
-            def.transformations(), def.deployment(), def.monitoring(),
-            def.tags(), def.metadata(), def.pipelineMetadata()
+            def.transformations(), def.dataQuality(), def.deployment(),
+            def.monitoring(), def.tags(), def.metadata(), def.pipelineMetadata()
         );
     }
 

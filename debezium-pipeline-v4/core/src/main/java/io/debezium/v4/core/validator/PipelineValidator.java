@@ -18,6 +18,7 @@ public class PipelineValidator {
         if (pipeline.tableMappings() != null && !pipeline.tableMappings().isEmpty()) validateMappings(pipeline.tableMappings(), issues);
         if (pipeline.deployment() != null) validateDeployment(pipeline.deployment(), issues);
         if (pipeline.monitoring() != null) validateMonitoring(pipeline.monitoring(), issues);
+        if (pipeline.dataQuality() != null && pipeline.dataQuality().enabled()) validateDataQuality(pipeline.dataQuality(), issues);
         return new ValidationResult(issues.stream().noneMatch(i -> i.severity() == Severity.ERROR), issues, summary(issues));
     }
 
@@ -58,6 +59,34 @@ public class PipelineValidator {
                 if (isBlank(rule.name())) issues.add(warning("alertRule.name", "Alert rule name missing"));
                 if (isBlank(rule.metric())) issues.add(warning("alertRule." + rule.name(), "Metric name missing"));
                 if (isBlank(rule.threshold())) issues.add(warning("alertRule." + rule.name(), "Threshold missing"));
+            }
+        }
+    }
+
+    private void validateDataQuality(DataQualityConfig dq, List<ValidationIssue> issues) {
+        if (dq.rules() == null || dq.rules().isEmpty()) {
+            issues.add(warning("dataQuality.rules", "Data quality enabled but no rules defined"));
+            return;
+        }
+        Set<String> ruleNames = new HashSet<>();
+        for (DataQualityRuleSpec rule : dq.rules()) {
+            if (isBlank(rule.name())) issues.add(error("dataQuality.rule.name", "Data quality rule name is required"));
+            else if (!ruleNames.add(rule.name())) issues.add(error("dataQuality.rule." + rule.name(), "Duplicate rule name: " + rule.name()));
+            if (isBlank(rule.ruleType())) issues.add(error("dataQuality.rule." + (rule.name() != null ? rule.name() : "?") + ".type", "Rule type is required"));
+            if (!List.of("NOT_NULL", "NOT_EMPTY", "REGEX", "RANGE", "EQUALS", "UNIQUE", "TYPE_CHECK", "MIN_LENGTH", "MAX_LENGTH", "COMPLETENESS", "ACCURACY", "CONSISTENCY", "TIMELINESS", "CUSTOM_SQL").contains(rule.ruleType()))
+                issues.add(warning("dataQuality.rule." + rule.name() + ".type", "Unknown rule type: " + rule.ruleType()));
+            if (!List.of("ROW", "COLUMN", "TABLE", "PIPELINE").contains(rule.scope()))
+                issues.add(warning("dataQuality.rule." + rule.name() + ".scope", "Unknown scope: " + rule.scope()));
+            if (!List.of("WARN", "ERROR", "FATAL").contains(rule.severity()))
+                issues.add(warning("dataQuality.rule." + rule.name() + ".severity", "Unknown severity: " + rule.severity() + ", expected WARN/ERROR/FATAL"));
+            if (!"ROW".equals(rule.scope()) && isBlank(rule.column()))
+                issues.add(warning("dataQuality.rule." + rule.name(), "Column scope rule has no column specified"));
+            if ("REGEX".equals(rule.ruleType()) && (rule.configuration() == null || isBlank(rule.configuration().get("pattern"))))
+                issues.add(warning("dataQuality.rule." + rule.name(), "REGEX rule missing 'pattern' in configuration"));
+            if ("RANGE".equals(rule.ruleType())) {
+                var cfg = rule.configuration();
+                if (cfg == null || (cfg.get("min") == null && cfg.get("max") == null))
+                    issues.add(warning("dataQuality.rule." + rule.name(), "RANGE rule missing 'min' or 'max' in configuration"));
             }
         }
     }

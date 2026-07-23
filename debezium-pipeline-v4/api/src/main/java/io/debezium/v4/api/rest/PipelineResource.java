@@ -1,6 +1,7 @@
 package io.debezium.v4.api.rest;
 
 import io.debezium.v4.core.model.*;
+import io.debezium.v4.core.engine.DataQualityEngine;
 import io.debezium.v4.core.engine.PipelineEngine;
 import io.debezium.v4.core.validator.PipelineValidator;
 import io.debezium.v4.ai.mapping.MappingEngine;
@@ -12,6 +13,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.*;
+import jakarta.ws.rs.DefaultValue;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
@@ -24,6 +26,7 @@ public class PipelineResource {
 
     @Inject PipelineEngine engine;
     @Inject PipelineValidator validator;
+    @Inject DataQualityEngine dqEngine;
     @Inject MappingEngine mappingEngine;
     @Inject MetricsCollector metrics;
     @Inject PluginRegistry pluginRegistry;
@@ -138,6 +141,51 @@ public class PipelineResource {
         return Response.ok(Map.of("reEncrypted", count)).build();
     }
 
+    // --- Data Quality ---
+
+    @POST
+    @Path("/{id}/quality/check")
+    @Operation(summary = "Run data quality checks on pipeline")
+    public Response runQualityCheck(@PathParam("id") String id, @HeaderParam("Authorization") String auth) {
+        return engine.get(id).map(p -> {
+            var config = p.dataQuality();
+            if (config == null || !config.enabled()) {
+                return Response.ok(Map.of("message", "Data quality checks not enabled for this pipeline",
+                    "results", List.of())).build();
+            }
+            List<Map<String, String>> sampleRecords = generateSampleRecords(p);
+            var results = dqEngine.runQualityCheck(id, config, sampleRecords);
+            return Response.ok(Map.of("pipelineId", id, "results", results, "total", results.size())).build();
+        }).orElse(Response.status(404).entity(Map.of("error", "Pipeline not found")).build());
+    }
+
+    @GET
+    @Path("/{id}/quality/results")
+    @Operation(summary = "Get data quality check results")
+    public Response getQualityResults(@PathParam("id") String id,
+            @QueryParam("limit") @DefaultValue("50") int limit,
+            @QueryParam("failed") @DefaultValue("false") boolean failedOnly) {
+        List<QualityCheckResult> results = failedOnly
+            ? dqEngine.getFailedResults(id)
+            : dqEngine.getLatestResults(id, limit);
+        return Response.ok(Map.of(
+            "pipelineId", id,
+            "results", results,
+            "total", results.size(),
+            "passRate", dqEngine.getPassRate(id),
+            "totalEvaluated", dqEngine.getTotalRowsEvaluated(id),
+            "totalFailures", dqEngine.getTotalFailures(id)
+        )).build();
+    }
+
+    @DELETE
+    @Path("/{id}/quality/results")
+    @Operation(summary = "Clear data quality check results")
+    public Response clearQualityResults(@PathParam("id") String id) {
+        dqEngine.clearResults(id);
+        return Response.noContent().build();
+    }
+
     @POST
     @Path("/{id}/duplicate")
     @Operation(summary = "Duplicate pipeline")
@@ -148,6 +196,39 @@ public class PipelineResource {
         } catch (IllegalArgumentException e) {
             return Response.status(404).entity(Map.of("error", e.getMessage())).build();
         }
+    }
+
+    private List<Map<String, String>> generateSampleRecords(PipelineDefinition p) {
+        List<Map<String, String>> records = new ArrayList<>();
+        Set<String> columnNames = new LinkedHashSet<>();
+        if (p.tableMappings() != null) {
+            for (var mapping : p.tableMappings()) {
+                if (mapping.columnMappings() != null) {
+                    for (var col : mapping.columnMappings()) {
+                        if (col.sourceColumn() != null) columnNames.add(col.sourceColumn());
+                    }
+                }
+            }
+        }
+        if (columnNames.isEmpty()) {
+            columnNames.add("id"); columnNames.add("name"); columnNames.add("status"); columnNames.add("value");
+        }
+        List<String> cols = new ArrayList<>(columnNames);
+        for (int i = 1; i <= 10; i++) {
+            Map<String, String> record = new HashMap<>();
+            for (int j = 0; j < cols.size(); j++) {
+                String colName = cols.get(j);
+                if (i % 3 == 0 && j == 0) {
+                    record.put(colName, "");
+                } else if (i % 5 == 0 && j == 1) {
+                    record.put(colName, "INVALID_" + i);
+                } else {
+                    record.put(colName, colName + "_" + i);
+                }
+            }
+            records.add(record);
+        }
+        return records;
     }
 
     private String resolveRunAsUser(String authHeader) {
