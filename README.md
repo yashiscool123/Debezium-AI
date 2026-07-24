@@ -292,6 +292,13 @@ Debezium AI/
     │   └── deployment/                         # Strimzi, Docker Compose deployment plugins
     └── nosql/                                  # NoSQL storage implementations
         └── mongodb/                            # MongoDB NoSqlStore, JobHistoryStore, ConfigStore
+
+├── pom.xml                                     # Root aggregator POM
+├── .mvn/wrapper/maven-wrapper.properties       # Maven wrapper config
+├── mvnw                                        # Maven wrapper (Unix)
+├── mvnw.cmd                                    # Maven wrapper (Windows)
+├── debezium-ai                                 # Unified CLI (Unix)
+└── debezium-ai.ps1                             # Unified CLI (Windows)
 ```
 
 ---
@@ -363,29 +370,49 @@ docker compose --profile streaming up -d
 docker compose --profile monitoring up -d
 ```
 
+**Or with the unified CLI:**
+```bash
+./debezium-ai docker dev
+./debezium-ai docker full
+./debezium-ai docker down
+```
+
 The installer walks through configuration options: database connection, Debezium Connect URL, Ollama endpoint, admin credentials, SSO provider, and export directory.
 
 ### Build
 
-#### Build entire project (including Debezium core)
+#### Quick build (using unified CLI)
 
 ```bash
-cd debezium-main
+# Build everything from root (Debezium Core + v3 + v4)
+./debezium-ai build
+
+# Build only v4
+./debezium-ai build v4
+
+# Build only v3
+./debezium-ai build v3
+```
+
+**Windows:**
+```powershell
+.\debezium-ai.ps1 build
+.\debezium-ai.ps1 build v4
+```
+
+#### Alternative: build individual projects
+
+```bash
+# Build entire project from root (all modules)
 ./mvnw clean install -Dquick -DskipITs
-```
 
-#### Build v3 pipeline generator
-
-```bash
+# Build v3 pipeline generator
 cd debezium-pipeline-generator
-./mvnw clean install -Dquick
-```
+../mvnw clean install -Dquick
 
-#### Build v4 pipeline generator
-
-```bash
+# Build v4 pipeline generator
 cd debezium-pipeline-v4
-./mvnw clean install -Dquick
+../mvnw clean install -Dquick
 ```
 
 > `-Dquick` skips tests, code formatting, and checks for fastest iteration.  
@@ -393,25 +420,51 @@ cd debezium-pipeline-v4
 
 ### Run
 
-#### Run v3 (Quarkus dev mode)
+#### Quick run (using unified CLI)
+
+```bash
+# Run v4 in dev mode at http://localhost:8080/v4
+./debezium-ai run v4
+
+# Run v3 in dev mode at http://localhost:8080/api/v1
+./debezium-ai run v3
+```
+
+**Windows:**
+```powershell
+.\debezium-ai.ps1 run v4
+```
+
+#### Run v3 (Quarkus dev mode) directly
 
 ```bash
 cd debezium-pipeline-generator
-./mvnw quarkus:dev
+../mvnw quarkus:dev
 ```
 
 Access at: `http://localhost:8080/api/v1`
 
-#### Run v4 (Quarkus dev mode)
+#### Run v4 (Quarkus dev mode) directly
 
 ```bash
 cd debezium-pipeline-v4
-./mvnw quarkus:dev
+../mvnw quarkus:dev
 ```
 
 Access at: `http://localhost:8080/v4`
 
-#### Run with Docker Compose (production-like)
+#### Run with Docker Compose (no Java/Maven needed)
+
+```bash
+# Dev profile (lightweight, recommended for getting started)
+./debezium-ai docker dev
+
+# Full stack with monitoring
+./debezium-ai docker full
+
+# Stop all services
+./debezium-ai docker down
+```
 
 ```bash
 # Start all services (Quarkus, Debezium Connect, Prometheus, Grafana)
