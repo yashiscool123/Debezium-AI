@@ -298,6 +298,34 @@ Debezium AI/
 
 ## Getting Started
 
+### Quick Start (Unified CLI)
+
+The `debezium-ai` CLI is your single entry point for all operations:
+
+```bash
+# Build everything (Debezium Core + v3 + v4)
+./debezium-ai build
+
+# Build only v4
+./debezium-ai build v4
+
+# Run v4 in dev mode at http://localhost:8080/v4
+./debezium-ai run v4
+
+# Start lightweight Docker stack (no Java/Maven needed)
+./debezium-ai docker dev
+
+# Interactive configuration wizard
+./debezium-ai setup
+```
+
+**Windows:**
+```powershell
+.\debezium-ai.ps1 build
+.\debezium-ai.ps1 run v4
+.\debezium-ai.ps1 docker dev
+```
+
 ### Prerequisites
 
 - Java 21 (JDK)
